@@ -70,5 +70,6 @@
     </main>
     <footer>Assistente Educacional Offline <span>•</span> Projeto em desenvolvimento</footer>
   </div>
+  <script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {})); }</script>
 </body>
 </html>
