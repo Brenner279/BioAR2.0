@@ -1,546 +1,74 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LiraMunguba Pro - Gerador de Horários</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="Assistente Educacional Offline: apoio ao ensino e à aprendizagem.">
+  <title>Assistente Educacional Offline</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans antialiased h-screen flex flex-col relative">
-
-    <header class="bg-gray-800 border-b border-gray-700 p-4 shadow-md flex justify-between items-center z-10 relative">
-        <div class="flex items-center space-x-2">
-            <span class="text-xl">📅</span>
-            <h1 class="text-lg md:text-xl font-bold tracking-wide text-indigo-400">LiraMunguba Pro</h1>
-        </div>
-        <div class="flex space-x-2">
-            <button onclick="abrirModalTurmas()" class="bg-blue-700 hover:bg-blue-600 text-white text-xs md:text-sm font-semibold px-3 py-2 rounded transition shadow">
-                🏫 Turmas
-            </button>
-            <button onclick="abrirModalBD()" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs md:text-sm font-semibold px-3 py-2 rounded transition shadow">
-                ⚙️ Professores
-            </button>
-            <button onclick="gerarGradeCompleta()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs md:text-sm font-semibold px-3 py-2 rounded shadow transition">
-                ⚡ Gerar
-            </button>
-            <button onclick="limparGrade()" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs md:text-sm px-3 py-2 rounded transition">
-                🧹
-            </button>
-        </div>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">✦</div>
+        <div><strong>Assistente Educacional</strong><span>Seu apoio para ensinar e aprender</span></div>
+      </div>
+      <span class="offline-pill"><i></i> Projeto offline</span>
     </header>
 
-    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <aside class="w-full lg:w-80 bg-gray-800 border-b lg:border-r border-gray-700 p-4 overflow-y-auto max-h-48 lg:max-h-full space-y-4">
-            <div>
-                <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Selecione o Turno</h2>
-                <select id="select-turno" onchange="alternarVisualizacaoTurno()" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-                    <option value="1">1º Turno (Matutino/Vespertino)</option>
-                    <option value="2">2º Turno (Vespertino/Noturno)</option>
-                </select>
-            </div>
-            <div class="hidden lg:block text-xs text-gray-400 space-y-2">
-                <h2 class="font-semibold text-gray-300 uppercase tracking-wider">Regras de Reunião (12h-15h)</h2>
-                <p><span class="text-red-400 font-bold">Seg:</span> Natureza | <span class="text-red-400 font-bold">Ter:</span> Humanas</p>
-                <p><span class="text-red-400 font-bold">Qua:</span> Linguagens | <span class="text-red-400 font-bold">Qui:</span> Matemática</p>
-            </div>
-        </aside>
+    <main class="main">
+      <section class="welcome">
+        <div class="eyebrow">APRENDIZAGEM • MATEMÁTICA • EDUCAÇÃO</div>
+        <h1>Olá, Professor!<br><em>Vamos aprender juntos?</em></h1>
+        <p>Um assistente educacional pensado para explicar, orientar e apoiar seus estudos — com privacidade e execução local no aparelho.</p>
+      </section>
 
-        <section class="flex-1 p-4 overflow-auto bg-gray-900">
-            <div id="painel-turno-1" class="bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-lg">
-                <h2 class="text-base font-bold text-indigo-400 mb-3">1º Turno — Escola Munguba do Jari</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[600px] border-collapse border border-gray-700 text-xs text-center">
-                        <thead>
-                            <tr id="header-turno-1" class="bg-gray-700 text-gray-200 uppercase text-[10px] tracking-wider"></tr>
-                        </thead>
-                        <tbody id="grid-body-turno-1"></tbody>
-                    </table>
-                </div>
-            </div>
+      <section class="status-card" aria-live="polite">
+        <div class="status-symbol">⌁</div>
+        <div class="status-copy">
+          <strong>Motor de inteligência artificial ainda não conectado</strong>
+          <span>Estamos preparando o aplicativo. Nesta primeira etapa, a interface está pronta; o modelo local será instalado e integrado no celular.</span>
+        </div>
+        <span class="status-tag">Etapa 1</span>
+      </section>
 
-            <div id="painel-turno-2" class="bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-lg hidden">
-                <h2 class="text-base font-bold text-teal-400 mb-3">2º Turno — Escola Munguba do Jari</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[600px] border-collapse border border-gray-700 text-xs text-center">
-                        <thead>
-                            <tr id="header-turno-2" class="bg-gray-700 text-gray-200 uppercase text-[10px] tracking-wider"></tr>
-                        </thead>
-                        <tbody id="grid-body-turno-2"></tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
+      <section class="feature-grid" aria-label="Recursos planejados">
+        <article class="feature">
+          <div class="feature-icon purple">∑</div>
+          <h2>Matemática</h2>
+          <p>Explicações e resoluções passo a passo.</p>
+        </article>
+        <article class="feature">
+          <div class="feature-icon blue">◉</div>
+          <h2>Conversa por voz</h2>
+          <p>Fale e escute as respostas do assistente.</p>
+        </article>
+        <article class="feature">
+          <div class="feature-icon green">▤</div>
+          <h2>Histórico local</h2>
+          <p>Conversas armazenadas no próprio aparelho.</p>
+        </article>
+      </section>
+
+      <section class="setup-card">
+        <div class="setup-heading">
+          <div><span class="eyebrow">PLANO DE IMPLEMENTAÇÃO</span><h2>Construindo o assistente</h2></div>
+          <span class="progress-label">1 de 5 etapas</span>
+        </div>
+        <ol class="steps">
+          <li class="done"><span>✓</span><div><strong>Interface inicial</strong><small>Estrutura visual e responsiva</small></div><b>Concluída</b></li>
+          <li class="active"><span>2</span><div><strong>Ambiente Android</strong><small>Preparar Termux e servidor local</small></div><b>Próxima</b></li>
+          <li><span>3</span><div><strong>Inteligência artificial local</strong><small>Instalar runtime e modelo GGUF</small></div></li>
+          <li><span>4</span><div><strong>Voz e histórico</strong><small>Reconhecimento e síntese de fala</small></div></li>
+          <li><span>5</span><div><strong>Modo Professor</strong><small>Especialização educacional e testes offline</small></div></li>
+        </ol>
+      </section>
+      <p class="privacy-note">🔒 Objetivo: depois da instalação dos modelos, funcionar sem conexão com a internet.</p>
     </main>
-
-    <div id="modal-turmas" class="fixed inset-0 bg-black/80 z-50 hidden flex-col items-center justify-center p-4">
-        <div class="bg-gray-800 border border-gray-600 rounded-xl w-full max-w-md flex flex-col shadow-2xl">
-            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-850 rounded-t-xl">
-                <h2 class="text-lg font-bold text-blue-400">🏫 Gerenciar Turmas</h2>
-                <button onclick="fecharModalTurmas()" class="text-gray-400 hover:text-white text-xl">&times;</button>
-            </div>
-            <div class="p-4 space-y-4 overflow-y-auto max-h-[60vh]">
-                <div class="flex space-x-2">
-                    <input type="text" id="input-nova-turma" placeholder="Ex: 1A" class="flex-1 bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white uppercase">
-                    <select id="input-turno-turma" class="bg-gray-900 border border-gray-600 rounded px-2 py-2 text-white text-sm">
-                        <option value="1">1º Turno</option>
-                        <option value="2">2º Turno</option>
-                    </select>
-                    <button onclick="adicionarTurma()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold">+</button>
-                </div>
-                <div id="lista-turmas" class="space-y-1 text-sm"></div>
-            </div>
-            <div class="p-3 border-t border-gray-700 bg-gray-850 text-right rounded-b-xl">
-                <button onclick="fecharModalTurmas()" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded text-xs">Concluir</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modal-bd" class="fixed inset-0 bg-black/80 z-50 hidden flex-col items-center justify-center p-4">
-        <div class="bg-gray-800 border border-gray-600 rounded-xl w-full max-w-3xl max-h-[95vh] flex flex-col shadow-2xl">
-            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-850 rounded-t-xl">
-                <h2 class="text-lg font-bold text-emerald-400" id="titulo-modal-prof">⚙️ Configurar Professores e Restrições</h2>
-                <button onclick="fecharModalBD()" class="text-gray-400 hover:text-white text-xl">&times;</button>
-            </div>
-
-            <div class="p-4 overflow-y-auto flex-1 space-y-6" id="container-scroll-modal">
-                <div class="bg-gray-750 p-4 rounded-lg border border-gray-650 space-y-4">
-                    <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider" id="formulario-acao-texto">Nova Disciplina/Professor</h3>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Disciplina (Ex: Mat-Michel)</label>
-                            <input type="text" id="input-nome" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Nome Professor(a)</label>
-                            <input type="text" id="input-prof" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Área (Para Reunião)</label>
-                            <select id="input-area" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white">
-                                <option value="Matemática">Matemática</option>
-                                <option value="Natureza">C. da Natureza</option>
-                                <option value="Humanas">C. Humanas</option>
-                                <option value="Linguagens">Linguagens</option>
-                                <option value="Interdisciplinar">Interdisciplinar</option>
-                            </select>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-xs text-gray-400 mb-1">Turma Alvo</label>
-                                <select id="input-turma-alvo" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"></select>
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-400 mb-1">Aulas Semanais</label>
-                                <input type="number" id="input-ch" value="2" min="1" max="10" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-white">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pt-3 border-t border-gray-600 space-y-3">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <h4 class="text-xs font-semibold text-amber-400 uppercase mb-2">Dias Permitidos (Vazio = Todos)</h4>
-                                <div id="checkbox-dias" class="flex flex-wrap gap-2"></div>
-                            </div>
-                            <div>
-                                <h4 class="text-xs font-semibold text-blue-400 uppercase mb-2">Horários Permitidos (Vazio = Todos)</h4>
-                                <div id="checkbox-horarios" class="grid grid-cols-2 gap-1"></div>
-                            </div>
-                        </div>
-                        <div class="w-full md:w-1/3">
-                            <label class="block text-xs text-gray-400 mb-1">Máx. Aulas no mesmo Dia</label>
-                            <input type="number" id="input-max-aulas" value="2" min="1" max="5" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-1 text-white text-xs">
-                        </div>
-                    </div>
-                    
-                    <button onclick="adicionarComponente()" id="btn-salvar-prof" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition shadow">
-                        + Salvar Configuração de Disciplina
-                    </button>
-                </div>
-
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wider">Disciplinas Cadastradas</h3>
-                    <div id="lista-bd" class="space-y-2"></div>
-                </div>
-            </div>
-            <div class="p-4 border-t border-gray-700 bg-gray-850 text-right rounded-b-xl">
-                <button onclick="fecharModalBD()" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded transition">Concluir</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const DIAS = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA"];
-        const HORARIOS_TURNO_1 = ["7h30-8h20", "8h20-9h10", "LANCHE", "9h30-10h20", "10h20-11h10", "11h10-12h", "ALMOÇO", "12h50-13h40", "13h40-14h30"];
-        const HORARIOS_TURNO_2 = ["15h30-16h20", "16h20-17h10", "LANCHE", "17h30-18h20", "18h20-19h10", "19h10-20h", "JANTAR", "20h20-21h20", "21h10-22h"];
-
-        let TURMAS = [];
-        let COMPONENTES = [];
-        let editandoIndex = -1;
-        let gradeTurno1 = {};
-        let gradeTurno2 = {};
-
-        function carregarDados() {
-            // Garante as turmas padrão se o cache estiver corrompido ou vazio
-            const turmasSalvas = localStorage.getItem("LiraPro_Turmas");
-            if (!turmasSalvas || JSON.parse(turmasSalvas).length === 0) {
-                TURMAS = [
-                    { nome: "1A", turno: 1 }, { nome: "2A", turno: 1 }, { nome: "3A", turno: 1 },
-                    { nome: "2B", turno: 2 }, { nome: "2C", turno: 2 }, { nome: "3B", turno: 2 }
-                ];
-                localStorage.setItem("LiraPro_Turmas", JSON.stringify(TURMAS));
-            } else {
-                TURMAS = JSON.parse(turmasSalvas);
-            }
-
-            COMPONENTES = JSON.parse(localStorage.getItem("LiraPro_DB_V3")) || [];
-            
-            montarCheckboxesRestricoes();
-            atualizarSelectTurmas();
-            inicializarEstruturas();
-            renderizarGradesEmTela();
-        }
-
-        function salvarDados() {
-            localStorage.setItem("LiraPro_Turmas", JSON.stringify(TURMAS));
-            localStorage.setItem("LiraPro_DB_V3", JSON.stringify(COMPONENTES));
-            atualizarSelectTurmas();
-            renderizarListaBD();
-            renderizarListaTurmas();
-        }
-
-        function inicializarEstruturas() {
-            DIAS.forEach(dia => {
-                gradeTurno1[dia] = HORARIOS_TURNO_1.map(() => {
-                    let obj = {}; getTurmas(1).forEach(t => obj[t] = null); return obj;
-                });
-                gradeTurno2[dia] = HORARIOS_TURNO_2.map(() => {
-                    let obj = {}; getTurmas(2).forEach(t => obj[t] = null); return obj;
-                });
-            });
-        }
-
-        function getTurmas(turno) { 
-            return TURMAS.filter(t => t.turno === parseInt(turno)).map(t => t.nome); 
-        }
-
-        function abrirModalTurmas() { 
-            document.getElementById("modal-turmas").classList.replace("hidden", "flex"); 
-            renderizarListaTurmas(); 
-        }
-        
-        function fecharModalTurmas() { 
-            document.getElementById("modal-turmas").classList.replace("flex", "hidden"); 
-            inicializarEstruturas(); 
-            renderizarGradesEmTela(); 
-        }
-        
-        function adicionarTurma() {
-            const nome = document.getElementById("input-nova-turma").value.trim().toUpperCase();
-            const turno = parseInt(document.getElementById("input-turno-turma").value);
-            if(!nome) return alert("Insira o nome da turma!");
-            if(TURMAS.some(t => t.nome === nome)) return alert("Turma já existe!");
-            TURMAS.push({ nome, turno });
-            salvarDados();
-            document.getElementById("input-nova-turma").value = "";
-            inicializarEstruturas();
-            renderizarGradesEmTela();
-        }
-
-        function removerTurma(nome) {
-            TURMAS = TURMAS.filter(t => t.nome !== nome);
-            COMPONENTES = COMPONENTES.filter(c => c.turma !== nome);
-            salvarDados();
-            inicializarEstruturas();
-            renderizarGradesEmTela();
-        }
-
-        function renderizarListaTurmas() {
-            const container = document.getElementById("lista-turmas"); container.innerHTML = "";
-            TURMAS.forEach(t => {
-                let div = document.createElement("div");
-                div.className = "flex justify-between items-center bg-gray-700 p-2 rounded mb-1";
-                div.innerHTML = `<span>${t.nome} (${t.turno}º Turno)</span>
-                    <button onclick="removerTurma('${t.nome}')" class="text-red-400 hover:text-red-600 font-bold px-2">X</button>`;
-                container.appendChild(div);
-            });
-        }
-
-        function atualizarSelectTurmas() {
-            const select = document.getElementById("input-turma-alvo"); 
-            if(!select) return;
-            select.innerHTML = "";
-            TURMAS.forEach(t => select.innerHTML += `<option value="${t.nome}">${t.nome}</option>`);
-        }
-
-        function montarCheckboxesRestricoes() {
-            const divDias = document.getElementById("checkbox-dias"); divDias.innerHTML = "";
-            DIAS.forEach(d => divDias.innerHTML += `<label class="inline-flex items-center bg-gray-900 px-2 py-1 rounded text-xs cursor-pointer"><input type="checkbox" name="rest-dia" value="${d}" class="mr-1"> ${d.substring(0,3)}</label>`);
-
-            const divHrs = document.getElementById("checkbox-horarios"); divHrs.innerHTML = "";
-            const labels = ["1º Hor.", "2º Hor.", "3º Hor.", "4º Hor.", "5º Hor.", "6º Hor.", "7º Hor."];
-            const indices = [0, 1, 3, 4, 5, 7, 8];
-            indices.forEach((val, i) => divHrs.innerHTML += `<label class="inline-flex items-center text-xs"><input type="checkbox" name="rest-hr" value="${val}" class="mr-1"> ${labels[i]}</label>`);
-        }
-
-        function abrirModalBD() { 
-            document.getElementById("modal-bd").classList.replace("hidden", "flex"); 
-            atualizarSelectTurmas();
-            cancelarEdicao();
-            renderizarListaBD(); 
-        }
-        function fecharModalBD() { 
-            document.getElementById("modal-bd").classList.replace("flex", "hidden"); 
-        }
-
-        function adicionarComponente() {
-            const nome = document.getElementById("input-nome").value.trim();
-            const prof = document.getElementById("input-prof").value.trim();
-            const area = document.getElementById("input-area").value;
-            const turma = document.getElementById("input-turma-alvo").value;
-            const ch = parseInt(document.getElementById("input-ch").value) || 2;
-            const maxAulas = parseInt(document.getElementById("input-max-aulas").value) || 2;
-
-            const diasMarcados = Array.from(document.querySelectorAll('input[name="rest-dia"]:checked')).map(el => el.value);
-            const hrsMarcadas = Array.from(document.querySelectorAll('input[name="rest-hr"]:checked')).map(el => el.value);
-
-            if(!nome || !prof) return alert("Preencha Código e Professor!");
-
-            const novaDisciplina = { nome, prof, area, turma, ch, maxAulas, diasPermitidos: diasMarcados, hrsPermitidas: hrsMarcadas };
-
-            if(editandoIndex === -1) {
-                COMPONENTES.push(novaDisciplina);
-            } else {
-                COMPONENTES[editandoIndex] = novaDisciplina;
-                editandoIndex = -1;
-                document.getElementById("btn-salvar-prof").className = "w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition shadow";
-                document.getElementById("btn-salvar-prof").innerText = "+ Salvar Configuração de Disciplina";
-                document.getElementById("formulario-acao-texto").innerText = "Nova Disciplina/Professor";
-                document.getElementById("formulario-acao-texto").className = "text-sm font-semibold text-gray-300 uppercase tracking-wider";
-            }
-
-            salvarDados();
-
-            document.getElementById("input-nome").value = ""; 
-            document.getElementById("input-prof").value = "";
-            document.querySelectorAll('input[name="rest-dia"]:checked').forEach(el => el.checked = false);
-            document.querySelectorAll('input[name="rest-hr"]:checked').forEach(el => el.checked = false);
-        }
-
-        function prepararEdicao(idx) {
-            editandoIndex = idx;
-            const c = COMPONENTES[idx];
-
-            document.getElementById("input-nome").value = c.nome;
-            document.getElementById("input-prof").value = c.prof;
-            document.getElementById("input-area").value = c.area;
-            document.getElementById("input-turma-alvo").value = c.turma;
-            document.getElementById("input-ch").value = c.ch;
-            document.getElementById("input-max-aulas").value = c.maxAulas;
-
-            document.querySelectorAll('input[name="rest-dia"]').forEach(el => {
-                el.checked = c.diasPermitidos.includes(el.value);
-            });
-
-            document.querySelectorAll('input[name="rest-hr"]').forEach(el => {
-                el.checked = c.hrsPermitidas.includes(el.value);
-            });
-
-            document.getElementById("btn-salvar-prof").className = "w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded transition shadow";
-            document.getElementById("btn-salvar-prof").innerText = "💾 Atualizar Disciplina";
-            
-            const txtAcao = document.getElementById("formulario-acao-texto");
-            txtAcao.innerText = "✏️ Editando Disciplina Selecionada...";
-            txtAcao.className = "text-sm font-bold text-amber-400 uppercase tracking-wider";
-
-            document.getElementById("container-scroll-modal").scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function cancelarEdicao() {
-            editandoIndex = -1;
-            document.getElementById("input-nome").value = ""; 
-            document.getElementById("input-prof").value = "";
-            document.querySelectorAll('input[name="rest-dia"]:checked').forEach(el => el.checked = false);
-            document.querySelectorAll('input[name="rest-hr"]:checked').forEach(el => el.checked = false);
-            document.getElementById("btn-salvar-prof").className = "w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition shadow";
-            document.getElementById("btn-salvar-prof").innerText = "+ Salvar Configuração de Disciplina";
-            document.getElementById("formulario-acao-texto").innerText = "Nova Disciplina/Professor";
-            document.getElementById("formulario-acao-texto").className = "text-sm font-semibold text-gray-300 uppercase tracking-wider";
-        }
-
-        function removerComponente(idx) { 
-            if(confirm("Remover professor da base de dados?")) {
-                if(editandoIndex === idx) cancelarEdicao();
-                COMPONENTES.splice(idx, 1); 
-                salvarDados(); 
-            }
-        }
-
-        function renderizarListaBD() {
-            const div = document.getElementById("lista-bd"); div.innerHTML = "";
-            COMPONENTES.forEach((c, idx) => {
-                let infoDias = c.diasPermitidos.length ? c.diasPermitidos.map(d=>d.substring(0,3)).join("/") : "Qualquer Dia";
-                let infoHrs = c.hrsPermitidas.length ? "Horários Travados" : "Qualquer Horário";
-                
-                div.innerHTML += `<div class="bg-gray-700 p-2 text-xs rounded flex justify-between items-center border border-gray-600">
-                    <div class="flex-1 mr-2">
-                        <b class="text-indigo-300 text-sm">${c.nome}</b> -> Turma: <span class="text-emerald-400 font-bold">${c.turma}</span> [C.H: ${c.ch} Aulas]<br>
-                        <span class="text-gray-400">Prof: ${c.prof} | Dias: ${infoDias} | Horários: ${infoHrs} | Limite: ${c.maxAulas}/dia</span>
-                    </div>
-                    <div class="flex space-x-1 shrink-0">
-                        <button onclick="prepararEdicao(${idx})" class="bg-amber-700/80 p-1.5 rounded text-white hover:bg-amber-600 text-[11px] transition">Editar</button>
-                        <button onclick="removerComponente(${idx})" class="bg-red-900/80 p-1.5 rounded text-white hover:bg-red-600 text-[11px] transition">Excluir</button>
-                    </div>
-                </div>`;
-            });
-        }
-
-        function validarConflito(dia, indexHorario, turma, componente, turnoAlvo) {
-            const prof = componente.prof;
-
-            if (turnoAlvo === 1 && (indexHorario === 7 || indexHorario === 8)) {
-                if (dia === "SEGUNDA" && componente.area === "Natureza") return false;
-                if (dia === "TERÇA" && componente.area === "Humanas") return false;
-                if (dia === "QUARTA" && componente.area === "Linguagens") return false;
-                if (dia === "QUINTA" && componente.area === "Matemática") return false;
-            }
-
-            const gradeDoTurno = turnoAlvo === 1 ? gradeTurno1[dia][indexHorario] : gradeTurno2[dia][indexHorario];
-            for (let t in gradeDoTurno) {
-                if (gradeDoTurno[t] && gradeDoTurno[t].prof === prof) return false;
-            }
-
-            if (componente.diasPermitidos.length > 0 && !componente.diasPermitidos.includes(dia)) return false;
-            if (componente.hrsPermitidas.length > 0 && !componente.hrsPermitidas.includes(indexHorario.toString())) return false;
-
-            let contagemHoje = 0;
-            const listaHorariosDia = turnoAlvo === 1 ? gradeTurno1[dia] : gradeTurno2[dia];
-            listaHorariosDia.forEach(h => { 
-                if(h && h[turma] && h[turma].nome === componente.nome) contagemHoje++; 
-            });
-            if (contagemHoje >= componente.maxAulas) return false;
-
-            return true;
-        }
-
-        function gerarGradeCompleta() {
-            inicializarEstruturas();
-            
-            let chRestante = COMPONENTES.map(c => ({ ...c, aulasAlocadas: 0 }));
-
-            for (let passada = 0; passada < 15; passada++) {
-                DIAS.forEach(dia => {
-                    [1, 2].forEach(turno => {
-                        const horarios = turno === 1 ? HORARIOS_TURNO_1 : HORARIOS_TURNO_2;
-                        const gradeAlvo = turno === 1 ? gradeTurno1 : gradeTurno2;
-                        const turmasDoTurno = getTurmas(turno);
-
-                        horarios.forEach((horario, idx) => {
-                            if (horario === "LANCHE" || horario === "ALMOÇO" || horario === "JANTAR") return;
-
-                            if (dia === "QUARTA" && (idx === 0 || idx === 1)) {
-                                turmasDoTurno.forEach(t => gradeAlvo[dia][idx][t] = { nome: "ELETIVA", prof: "Todos" });
-                                return;
-                            }
-
-                            turmasDoTurno.forEach(turma => {
-                                if (gradeAlvo[dia][idx][turma] !== null) return;
-
-                                let pendentes = chRestante.filter(c => c.turma === turma && c.aulasAlocadas < c.ch);
-                                pendentes.sort(() => Math.random() - 0.5);
-
-                                for (let comp of pendentes) {
-                                    if (validarConflito(dia, idx, turma, comp, turno)) {
-                                        gradeAlvo[dia][idx][turma] = { nome: comp.nome, prof: comp.prof };
-                                        comp.aulasAlocadas++;
-                                        break; 
-                                    }
-                                }
-                            });
-                        });
-                    });
-                });
-            }
-            renderizarGradesEmTela();
-        }
-
-        function renderizarGradesEmTela() {
-            // Re-renderização Dinâmica do Turno 1
-            const t1Turmas = getTurmas(1);
-            const h1 = document.getElementById("header-turno-1");
-            if (h1) {
-                h1.innerHTML = `<th class="p-2 border border-gray-600 w-16">Dia</th><th class="p-2 border border-gray-600 w-24">Horário</th>`;
-                t1Turmas.forEach(t => h1.innerHTML += `<th class="p-2 border border-gray-600 bg-gray-900">${t}</th>`);
-            }
-
-            const tbody1 = document.getElementById("grid-body-turno-1"); 
-            if (tbody1) {
-                tbody1.innerHTML = "";
-                DIAS.forEach(dia => {
-                    HORARIOS_TURNO_1.forEach((horario, idx) => {
-                        let tr = document.createElement("tr"); tr.className = "hover:bg-gray-750 border-b border-gray-700/50";
-                        if (idx === 0) tr.innerHTML = `<td class="p-2 font-bold bg-gray-850 border-r border-gray-700" rowspan="${HORARIOS_TURNO_1.length}">${dia.substring(0,3)}</td>`;
-                        tr.innerHTML += `<td class="p-1 text-gray-400 bg-gray-900/30 text-[10px] md:text-xs">${horario}</td>`;
-
-                        if (horario === "LANCHE" || horario === "ALMOÇO") {
-                            tr.innerHTML += `<td colspan="${t1Turmas.length || 1}" class="bg-amber-950/40 text-amber-500 py-1 text-[10px] font-bold tracking-widest">${horario}</td>`;
-                        } else {
-                            t1Turmas.forEach(t => {
-                                const aula = gradeTurno1[dia] && gradeTurno1[dia][idx] ? gradeTurno1[dia][idx][t] : null;
-                                let estilo = aula ? (aula.nome === "ELETIVA" ? "bg-amber-800/80 text-amber-100" : "bg-indigo-950/60 text-indigo-200") : "text-gray-600";
-                                tr.innerHTML += `<td class="p-1 border-l border-gray-700/60 ${estilo}">${aula ? aula.nome : "-"}</td>`;
-                            });
-                        }
-                        tbody1.appendChild(tr);
-                    });
-                });
-            }
-
-            // Re-renderização Dinâmica do Turno 2 (Corrigido!)
-            const t2Turmas = getTurmas(2);
-            const h2 = document.getElementById("header-turno-2");
-            if (h2) {
-                h2.innerHTML = `<th class="p-2 border border-gray-600 w-16">Dia</th><th class="p-2 border border-gray-600 w-24">Horário</th>`;
-                t2Turmas.forEach(t => h2.innerHTML += `<th class="p-2 border border-gray-600 bg-gray-900">${t}</th>`);
-            }
-
-            const tbody2 = document.getElementById("grid-body-turno-2"); 
-            if (tbody2) {
-                tbody2.innerHTML = "";
-                DIAS.forEach(dia => {
-                    HORARIOS_TURNO_2.forEach((horario, idx) => {
-                        let tr = document.createElement("tr"); tr.className = "hover:bg-gray-750 border-b border-gray-700/50";
-                        if (idx === 0) tr.innerHTML = `<td class="p-2 font-bold bg-gray-850 border-r border-gray-700" rowspan="${HORARIOS_TURNO_2.length}">${dia.substring(0,3)}</td>`;
-                        tr.innerHTML += `<td class="p-1 text-gray-400 bg-gray-900/30 text-[10px] md:text-xs">${horario}</td>`;
-
-                        if (horario === "LANCHE" || horario === "JANTAR") {
-                            tr.innerHTML += `<td colspan="${t2Turmas.length || 1}" class="bg-teal-950/40 text-teal-400 py-1 text-[10px] font-bold tracking-widest">${horario}</td>`;
-                        } else {
-                            t2Turmas.forEach(t => {
-                                const aula = gradeTurno2[dia] && gradeTurno2[dia][idx] ? gradeTurno2[dia][idx][t] : null;
-                                let estilo = aula ? (aula.nome === "ELETIVA" ? "bg-amber-800/80 text-amber-100" : "bg-teal-950/40 text-teal-200") : "text-gray-600";
-                                tr.innerHTML += `<td class="p-1 border-l border-gray-700/60 ${estilo}">${aula ? aula.nome : "-"}</td>`;
-                            });
-                        }
-                        tbody2.appendChild(tr);
-                    });
-                });
-            }
-        }
-
-        function alternarVisualizacaoTurno() {
-            const v = document.getElementById("select-turno").value;
-            document.getElementById("painel-turno-1").classList.toggle("hidden", v !== "1");
-            document.getElementById("painel-turno-2").classList.toggle("hidden", v !== "2");
-        }
-
-        function limparGrade() { 
-            inicializarEstruturas(); 
-            renderizarGradesEmTela(); 
-        }
-
-        window.addEventListener("DOMContentLoaded", carregarDados);
-    </script>
+    <footer>Assistente Educacional Offline <span>•</span> Projeto em desenvolvimento</footer>
+  </div>
 </body>
 </html>
