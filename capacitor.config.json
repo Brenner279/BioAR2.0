@@ -1,0 +1,8 @@
+{
+  "appId": "br.com.michelbrenner.bioar",
+  "appName": "BioAR",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
