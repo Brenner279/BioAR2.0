@@ -2,7 +2,7 @@
 export default {
   content: [
     './index.html',
-    './src/**/*.{js,ts,html}'
+    './.offline-build/index.html'
   ],
   theme: {
     extend: {
