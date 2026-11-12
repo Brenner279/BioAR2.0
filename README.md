@@ -2,20 +2,24 @@
 
 O BioAR mantém os quatro modelos anatômicos construídos em Three.js (coração, cérebro, pulmões e sistema digestório), animações, seleção de estruturas, pinos de identificação, quiz e narração.
 
+## Site e aplicativo
+
+O `index.html` da raiz continua sendo a versão web publicada no GitHub Pages. O build Android gera uma cópia isolada em `.offline-build`, substitui as referências externas por dependências locais e compila essa cópia para dentro do APK. Assim, a publicação web não é afetada pela preparação do aplicativo.
+
 ## Funcionamento offline
 
-O build empacota dentro do aplicativo:
+O APK empacota:
 - Three.js;
 - Tailwind CSS compilado em arquivo estático;
 - fontes Nunito;
 - ícones Phosphor (pesos Bold e Fill);
 - HTML, CSS e JavaScript do Atlas.
 
-O manifesto Android gerado pelo workflow inclui permissão para a câmera e remove a permissão de internet. O Atlas 3D, as animações e o quiz não precisam de rede.
+O workflow configura a permissão de câmera e remove a permissão de internet do manifesto principal do aplicativo. O Atlas 3D, as animações e o quiz funcionam sem rede.
 
 ### Narração
 
-A narração usa a voz de síntese de fala instalada no Android. O aplicativo seleciona somente uma voz marcada pelo sistema como local e em português. Para ouvir sem internet, instale previamente uma voz de português (Brasil) offline nas configurações de Texto para fala do aparelho. Se não houver uma voz local compatível, o BioAR informa isso e não tenta usar uma voz online.
+A narração usa a voz de síntese de fala instalada no Android. O BioAR seleciona somente uma voz marcada pelo sistema como local e em português. Para ouvir sem internet, instale previamente uma voz de português (Brasil) offline nas configurações de Texto para fala do aparelho. Se não houver uma voz local compatível, o BioAR informa isso e não tenta usar uma voz online.
 
 ### Câmera
 
