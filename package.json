@@ -4,9 +4,9 @@
   "private": true,
   "description": "BioAR — Atlas de Anatomia 3D educacional, empacotado para Android e funcionamento offline.",
   "scripts": {
-    "dev": "npm run copy:vendor && vite --host 0.0.0.0",
+    "dev": "node scripts/prepare-offline.mjs && node scripts/copy-vendor.mjs && vite .offline-build --config vite.config.js --host 0.0.0.0",
     "copy:vendor": "node scripts/copy-vendor.mjs",
-    "build": "npm run copy:vendor && vite build",
+    "build": "node scripts/prepare-offline.mjs && node scripts/copy-vendor.mjs && vite build .offline-build --config vite.config.js",
     "preview": "vite preview --host 0.0.0.0",
     "android:add": "cap add android",
     "android:sync": "npm run build && cap sync android",
