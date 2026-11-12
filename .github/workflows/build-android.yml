@@ -55,7 +55,7 @@ jobs:
 
       - name: Verify offline web bundle
         run: |
-          if grep -R -E 'cdn\\.tailwindcss\\.com|cdnjs\\.cloudflare\\.com/ajax/libs/three|unpkg\\.com/@phosphor-icons/web|fonts\\.googleapis\\.com' dist; then
+          if grep -R -E 'cdn\.tailwindcss\.com|cdnjs\.cloudflare\.com/ajax/libs/three|unpkg\.com/@phosphor-icons/web|fonts\.googleapis\.com' dist; then
             echo 'Uma dependência externa foi encontrada no bundle offline.'
             exit 1
           fi
