@@ -7,7 +7,7 @@
     "dev": "node scripts/prepare-offline.mjs && node scripts/copy-vendor.mjs && vite .offline-build --config vite.config.js --host 0.0.0.0",
     "copy:vendor": "node scripts/copy-vendor.mjs",
     "build": "node scripts/prepare-offline.mjs && node scripts/copy-vendor.mjs && vite build .offline-build --config vite.config.js",
-    "preview": "vite preview --host 0.0.0.0",
+    "preview": "vite preview --outDir dist --host 0.0.0.0",
     "android:add": "cap add android",
     "android:sync": "npm run build && cap sync android",
     "android:open": "cap open android",
