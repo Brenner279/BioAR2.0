@@ -4,3 +4,5 @@ android/
 .gradle/
 *.log
 .DS_Store
+
+.offline-build/
