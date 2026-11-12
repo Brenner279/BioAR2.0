@@ -1,0 +1,102 @@
+name: Build BioAR Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'src/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - 'vite.config.js'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - '.github/workflows/build-android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build offline APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+
+      - name: Configure Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Configure Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build local web assets
+        run: npm run build
+
+      - name: Create Android project
+        run: npx cap add android
+
+      - name: Sync local assets with Android
+        run: npx cap sync android
+
+      - name: Configure offline camera permission
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          content = manifest.read_text(encoding="utf-8")
+
+          # A aplicação usa apenas arquivos locais. Remova a permissão de rede
+          # para impedir requisições externas durante a execução.
+          content = re.sub(
+              r'\s*<uses-permission[^>]*android:name="android\.permission\.INTERNET"[^>]*/>',
+              '',
+              content
+          )
+
+          camera_permission = '    <uses-permission android:name="android.permission.CAMERA" />'
+          camera_feature = '    <uses-feature android:name="android.hardware.camera.any" android:required="false" />'
+
+          if "android.permission.CAMERA" not in content:
+              content = content.replace("<application", camera_permission + "\n" + camera_feature + "\n\n    <application", 1)
+
+          manifest.write_text(content, encoding="utf-8")
+          print("Manifesto Android configurado para câmera e sem permissão de internet.")
+          PY
+
+      - name: Build installable debug APK
+        run: |
+          cd android
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BioAR-offline-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
