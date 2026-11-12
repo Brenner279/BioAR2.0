@@ -1129,6 +1129,14 @@
 
         // Leitura em Voz Alta (Acessibilidade & Didática)
         function speakCurrentInfo() {
+            const organData = ORGANS_DATA[currentOrganKey];
+            const selectedPart = selectedPartId
+                ? organData.parts.find(part => part.id === selectedPartId)
+                : null;
+            const narrationTitle = selectedPart ? selectedPart.name : organData.name;
+            const narrationDescription = selectedPart ? selectedPart.description : organData.description;
+            const narrationFact = selectedPart ? selectedPart.funFact : organData.funFact;
+
             if (!('speechSynthesis' in window)) {
                 updateInfoCard({
                     badge: "🔊",
@@ -1142,8 +1150,7 @@
             }
 
             const synth = window.speechSynthesis;
-            const voices = synth.getVoices();
-            const localPortugueseVoice = voices.find(voice =>
+            const localPortugueseVoice = synth.getVoices().find(voice =>
                 voice.localService === true && /^pt[-_]/i.test(voice.lang)
             );
 
@@ -1152,18 +1159,17 @@
                     badge: "🔊",
                     system: "Narração offline",
                     title: "Voz em português não encontrada",
-                    description: "Para narrar sem internet, instale uma voz em português (Brasil) no mecanismo de Texto para fala do Android. Depois, volte ao BioAR e tente novamente.",
-                    funFact: "O aplicativo não usará vozes online: assim, a narração não dependerá de conexão com a internet.",
+                    description: "Para narrar sem internet, instale uma voz em português (Brasil) no mecanismo de Texto para fala do Android. Caso já tenha instalado, aguarde alguns segundos e tente novamente.",
+                    funFact: "O BioAR usa somente vozes locais. Ele não recorrerá a serviços de voz pela internet.",
                     color: "#0ea5e9"
                 });
                 return;
             }
 
             synth.cancel();
-            const title = document.getElementById('info-title').innerText;
-            const desc = document.getElementById('info-description').innerText;
-            const fact = document.getElementById('info-funfact').innerText;
-            const utterance = new SpeechSynthesisUtterance(`${title}. ${desc}. Curiosidade: ${fact}`);
+            const utterance = new SpeechSynthesisUtterance(
+                `${narrationTitle}. ${narrationDescription}. Curiosidade: ${narrationFact}`
+            );
             utterance.voice = localPortugueseVoice;
             utterance.lang = localPortugueseVoice.lang || 'pt-BR';
             utterance.rate = 1.05;
