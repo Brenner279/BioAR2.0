@@ -1,0 +1,36 @@
+/* Fontes e ícones locais: nenhuma chamada a Google Fonts ou CDN em tempo de execução. */
+@import "@fontsource/nunito/400.css";
+@import "@fontsource/nunito/600.css";
+@import "@fontsource/nunito/700.css";
+@import "@fontsource/nunito/800.css";
+@import "@fontsource/nunito/900.css";
+@import "@phosphor-icons/web/src/bold/style.css";
+@import "@phosphor-icons/web/src/fill/style.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  overscroll-behavior: none;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-x pan-y;
+}
+
+/* Evita que a seleção de texto atrapalhe os controles de toque do Atlas. */
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+canvas {
+  display: block;
+}
