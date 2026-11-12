@@ -99,6 +99,22 @@ jobs:
           cd android
           ./gradlew --no-daemon assembleDebug
 
+      - name: Verify APK permissions
+        shell: bash
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$AAPT" dump permissions "$APK" > /tmp/bioar-permissions.txt
+          cat /tmp/bioar-permissions.txt
+          if ! grep -q "android.permission.CAMERA" /tmp/bioar-permissions.txt; then
+            echo "A permissão da câmera não foi incluída no APK."
+            exit 1
+          fi
+          if grep -q "android.permission.INTERNET" /tmp/bioar-permissions.txt; then
+            echo "O APK ainda declara permissão de internet."
+            exit 1
+          fi
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
