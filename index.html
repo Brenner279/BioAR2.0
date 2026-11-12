@@ -144,6 +144,12 @@
 
         <!-- Botões de Ação Rápida no Topo -->
         <div class="flex items-center gap-2">
+            <!-- Scanner nativo ARCore -->
+            <button id="btn-arcore" onclick="startMarkerScanner()" class="cartoon-btn bg-emerald-400 hover:bg-emerald-300 text-slate-900 font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm" title="Reconhecer o marcador do coração com ARCore">
+                <i class="ph-bold ph-scan text-lg"></i>
+                <span class="hidden sm:inline">Modo RA</span>
+            </button>
+
             <!-- Alternar Câmera Real / Simulador -->
             <button id="btn-camera" onclick="toggleCamera()" class="cartoon-btn bg-sky-400 hover:bg-sky-300 text-slate-900 font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm">
                 <i class="ph-bold ph-camera text-lg"></i>
@@ -1183,6 +1189,62 @@
 
         // Ativar Câmera Real WebRTC para experiência RA
         let mediaStream = null;
+
+        async function startMarkerScanner() {
+            const nativePlugin = window.Capacitor?.Plugins?.BioARCore;
+            if (!nativePlugin || (window.Capacitor?.isNativePlatform && !window.Capacitor.isNativePlatform())) {
+                updateInfoCard({
+                    badge: "📷",
+                    system: "Realidade Aumentada • ARCore",
+                    title: "Scanner no APK Android",
+                    description: "O reconhecimento do marcador A1 funciona na versão Android com ARCore. O Atlas 3D permanece disponível nesta versão web.",
+                    funFact: "Esta primeira etapa valida a leitura da imagem; a ancoragem do órgão 3D será ligada na próxima etapa.",
+                    color: "#10b981"
+                });
+                return;
+            }
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                document.getElementById('camera-stream').classList.add('hidden');
+                document.getElementById('camera-btn-text').innerText = "Usar Câmera Real";
+            }
+
+            try {
+                const result = await nativePlugin.startMarkerScanner();
+                if (result?.recognized && result?.markerId === "heart") {
+                    selectOrgan("heart");
+                    updateInfoCard({
+                        badge: "❤️",
+                        system: "ARCore • Marcador A1",
+                        title: "Marcador do coração reconhecido",
+                        description: "O Galaxy identificou o marcador A1 por meio do rastreamento de imagens do ARCore. Nesta etapa validamos a leitura; o modelo 3D ancorado será integrado na próxima etapa.",
+                        funFact: "Reconhecimento processado no aparelho. A imagem de referência está empacotada no APK.",
+                        color: "#10b981"
+                    });
+                } else {
+                    updateInfoCard({
+                        badge: "🔎",
+                        system: "ARCore • Marcador A1",
+                        title: "Marcador não confirmado",
+                        description: "Tente novamente com a folha plana, boa iluminação e o cartão inteiro visível. Não incline nem estique a impressão.",
+                        funFact: "Imprima o marcador A1 em 14 × 14 cm, sem cortar a moldura.",
+                        color: "#0ea5e9"
+                    });
+                }
+            } catch (error) {
+                updateInfoCard({
+                    badge: "⚠️",
+                    system: "ARCore • Diagnóstico",
+                    title: "Não foi possível iniciar o scanner",
+                    description: error?.message || "Verifique a permissão da câmera e se o Google Play Services para RA está atualizado.",
+                    funFact: "O Atlas 3D permanece disponível mesmo quando o ARCore não pode ser iniciado.",
+                    color: "#f59e0b"
+                });
+            }
+        }
+
         async function toggleCamera() {
             const videoEl = document.getElementById('camera-stream');
             const btnText = document.getElementById('camera-btn-text');

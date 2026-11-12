@@ -10,6 +10,7 @@ on:
       - 'src/**'
       - 'public/**'
       - 'scripts/**'
+      - 'native/**'
       - 'package.json'
       - 'capacitor.config.json'
       - 'vite.config.js'
@@ -88,6 +89,9 @@ jobs:
       - name: Configure offline camera permission
         run: node scripts/prepare-android.mjs
 
+      - name: Configure native ARCore image scanner
+        run: node scripts/prepare-arcore.mjs
+
       - name: Build installable debug APK
         run: |
           cd android
@@ -106,6 +110,10 @@ jobs:
           fi
           if grep -q "android.permission.INTERNET" /tmp/bioar-permissions.txt; then
             echo "O APK ainda declara permissão de internet."
+            exit 1
+          fi
+          if ! unzip -l "$APK" | grep -q "assets/ar_markers/heart-marker.png"; then
+            echo "O marcador offline do coração não foi incluído no APK."
             exit 1
           fi
 
