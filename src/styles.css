@@ -4,8 +4,8 @@
 @import "@fontsource/nunito/700.css";
 @import "@fontsource/nunito/800.css";
 @import "@fontsource/nunito/900.css";
-@import "@phosphor-icons/web/src/bold/style.css";
-@import "@phosphor-icons/web/src/fill/style.css";
+@import "@phosphor-icons/web/bold";
+@import "@phosphor-icons/web/fill";
 
 @tailwind base;
 @tailwind components;
