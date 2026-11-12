@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BioAR - Atlas de Anatomia 3D</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js para Gráficos 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Ícones Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts: Nunito (amigável e arredondada para estilo educativo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0f172a;
+        }
+
+        /* Fundo simulado de mesa de estudos quando a câmera está desligada */
+        .ar-simulated-bg {
+            background: radial-gradient(circle at 50% 45%, #334155 0%, #0f172a 100%);
+            position: relative;
+        }
+
+        /* Marcador de RA estilizado no chão/mesa */
+        .ar-grid-floor {
+            background-image: 
+                linear-gradient(to right, rgba(56, 189, 248, 0.15) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(56, 189, 248, 0.15) 1px, transparent 1px);
+            background-size: 40px 40px;
+            transform: perspective(600px) rotateX(65deg);
+            transform-origin: center center;
+        }
+
+        /* Estilo dos Pinos de Anotação 3D (Hotspots) */
+        .hotspot {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .hotspot:hover, .hotspot.active {
+            transform: translate(-50%, -50%) scale(1.25);
+            z-index: 30;
+        }
+
+        .hotspot-pulse {
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            80%, 100% { transform: scale(2.2); opacity: 0; }
+        }
+
+        /* Contorno estilo Cartoon / Toon UI */
+        .cartoon-card {
+            border: 3px solid #1e293b;
+            box-shadow: 0 6px 0 #1e293b;
+        }
+        
+        .cartoon-btn {
+            border: 2.5px solid #1e293b;
+            box-shadow: 0 4px 0 #1e293b;
+            transition: all 0.1s ease;
+        }
+        
+        .cartoon-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #1e293b;
+        }
+
+        /* Ocultar barra de rolagem horizontal nos seletores */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex flex-col justify-between overflow-hidden">
+
+    <!-- 1. CAMADA DE FUNDO: Câmera Real (WebRTC) + Fundo Simulado RA -->
+    <div id="ar-background" class="absolute inset-0 ar-simulated-bg z-0 flex items-center justify-center overflow-hidden">
+        <!-- Vídeo da câmera real caso o usuário ative -->
+        <video id="camera-stream" class="absolute inset-0 w-full h-full object-cover hidden" playsinline muted></video>
+        
+        <!-- Grade de plano de superfície de Realidade Aumentada -->
+        <div id="ar-surface-grid" class="w-[140vw] h-[140vw] max-w-[900px] max-h-[900px] ar-grid-floor flex items-center justify-center pointer-events-none mt-48">
+            <div class="w-64 h-64 rounded-full border-4 border-dashed border-sky-400/50 flex items-center justify-center animate-[spin_25s_linear_infinite]">
+                <div class="w-48 h-48 rounded-full border-2 border-emerald-400/40 flex items-center justify-center">
+                    <span class="text-sky-300/40 font-black text-xs tracking-widest uppercase">Marcador RA Detectado</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mira do Scanner RA -->
+        <div id="ar-reticle" class="absolute inset-0 pointer-events-none flex items-center justify-center opacity-30">
+            <div class="w-72 h-72 sm:w-96 sm:h-96 relative">
+                <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl"></div>
+                <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl"></div>
+                <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl"></div>
+                <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. CAMADA DO CANVAS 3D (Three.js) -->
+    <div id="canvas-container" class="absolute inset-0 z-10"></div>
+
+    <!-- 3. CAMADA DE ANOTAÇÕES 3D (Pinos Flutuantes Mapeados) -->
+    <div id="hotspots-container" class="absolute inset-0 z-20 pointer-events-none overflow-hidden"></div>
+
+    <!-- 4. INTERFACE DO USUÁRIO (HUD DO APLICATIVO ANDROID) -->
+    
+    <!-- Barra Superior -->
+    <header class="relative z-30 p-3 sm:p-4 flex items-center justify-between gap-2 pointer-events-auto">
+        <!-- Logo & Status RA -->
+        <div class="flex items-center gap-2.5 bg-white px-3.5 py-2 rounded-2xl cartoon-card">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-orange-400 flex items-center justify-center text-white text-xl shadow-inner border-2 border-slate-800">
+                <i class="ph-fill ph-heartbeat"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-1.5">
+                    <h1 class="font-black text-slate-800 text-base sm:text-lg leading-none">BioAR</h1>
+                    <span class="bg-emerald-100 text-emerald-800 border border-emerald-500 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full uppercase flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> RA Ativa
+                    </span>
+                </div>
+                <p class="text-[11px] font-bold text-slate-500 hidden sm:block">Toque e arraste para girar o órgão</p>
+            </div>
+        </div>
+
+        <!-- Botões de Ação Rápida no Topo -->
+        <div class="flex items-center gap-2">
+            <!-- Alternar Câmera Real / Simulador -->
+            <button id="btn-camera" onclick="toggleCamera()" class="cartoon-btn bg-sky-400 hover:bg-sky-300 text-slate-900 font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm">
+                <i class="ph-bold ph-camera text-lg"></i>
+                <span id="camera-btn-text" class="hidden md:inline">Usar Câmera Real</span>
+            </button>
+
+            <!-- Modo Quiz Educativo -->
+            <button id="btn-quiz" onclick="toggleQuizMode()" class="cartoon-btn bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm">
+                <i class="ph-bold ph-question text-lg"></i>
+                <span id="quiz-btn-text">Desafio Quiz</span>
+            </button>
+
+            <!-- Arquitetura do Projeto Android (Guia Técnico) -->
+            <button onclick="toggleTechModal(true)" class="cartoon-btn bg-violet-500 hover:bg-violet-400 text-white font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm" title="Como desenvolver no Android">
+                <i class="ph-bold ph-android-logo text-lg"></i>
+                <span class="hidden sm:inline">Guia Android</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Banner do Modo Quiz (Aparece apenas quando o Quiz está ativo) -->
+    <div id="quiz-banner" class="hidden relative z-30 mx-auto max-w-md w-[92%] bg-amber-300 px-4 py-3 rounded-2xl cartoon-card pointer-events-auto transition-all">
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-xl bg-white border-2 border-slate-800 flex items-center justify-center text-2xl shrink-0">
+                    🎯
+                </div>
+                <div>
+                    <span class="text-[11px] font-black uppercase tracking-wider text-amber-900 block">Encontre no modelo 3D:</span>
+                    <h2 id="quiz-question-target" class="text-base sm:text-lg font-black text-slate-900 leading-tight">Carregando pergunta...</h2>
+                </div>
+            </div>
+            <div class="text-right shrink-0 bg-white/80 px-2.5 py-1 rounded-xl border-2 border-slate-800">
+                <span class="text-[10px] font-extrabold text-slate-500 block">PONTOS</span>
+                <span id="quiz-score" class="text-base font-black text-emerald-600">0</span>
+            </div>
+        </div>
+        <p id="quiz-feedback" class="text-xs font-extrabold mt-1.5 text-slate-800 hidden"></p>
+    </div>
+
+    <!-- Controles Laterais Flutuantes (Explodir Partes, Pinos, Resetar) -->
+    <div class="fixed right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2.5 pointer-events-auto">
+        <button onclick="toggleExplodeView()" id="btn-explode" class="cartoon-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white hover:bg-slate-100 text-slate-800 flex flex-col items-center justify-center" title="Separar partes do órgão">
+            <i class="ph-bold ph-arrows-out text-lg sm:text-xl"></i>
+            <span class="text-[9px] font-extrabold">Separar</span>
+        </button>
+        <button onclick="toggleHotspots()" id="btn-hotspots" class="cartoon-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-400 text-slate-900 flex flex-col items-center justify-center" title="Mostrar/Ocultar Nomes">
+            <i class="ph-bold ph-map-pin text-lg sm:text-xl"></i>
+            <span class="text-[9px] font-extrabold">Pinos</span>
+        </button>
+        <button onclick="toggleAnimation()" id="btn-anim" class="cartoon-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-rose-400 text-slate-900 flex flex-col items-center justify-center" title="Pausar/Ativar Fisiologia">
+            <i class="ph-bold ph-play-pause text-lg sm:text-xl"></i>
+            <span class="text-[9px] font-extrabold">Ação</span>
+        </button>
+        <button onclick="resetCameraView()" class="cartoon-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white hover:bg-slate-100 text-slate-800 flex flex-col items-center justify-center" title="Centralizar Visão">
+            <i class="ph-bold ph-cube-focus text-lg sm:text-xl"></i>
+            <span class="text-[9px] font-extrabold">Centro</span>
+        </button>
+    </div>
+
+    <!-- Área Inferior: Card de Informações da Parte + Carrossel de Órgãos -->
+    <footer class="relative z-30 p-3 sm:p-4 flex flex-col items-center gap-3 pointer-events-none">
+        
+        <!-- Card Educativo de Detalhes da Parte Selecionada -->
+        <div id="info-card" class="w-full max-w-lg bg-white rounded-3xl p-4 sm:p-5 cartoon-card pointer-events-auto transition-all duration-300 transform translate-y-0">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div id="info-badge" class="w-11 h-11 rounded-2xl bg-rose-500 text-white font-black text-lg flex items-center justify-center border-2 border-slate-800 shrink-0 shadow-inner">
+                        1
+                    </div>
+                    <div>
+                        <span id="info-system-tag" class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-300">
+                            Sistema Cardiovascular
+                        </span>
+                        <h3 id="info-title" class="text-lg sm:text-xl font-black text-slate-800 leading-tight mt-0.5">
+                            Coração Humano
+                        </h3>
+                    </div>
+                </div>
+                <!-- Botão de Narração em Voz (Web Speech API) -->
+                <button onclick="speakCurrentInfo()" class="cartoon-btn bg-sky-100 hover:bg-sky-200 text-sky-900 p-2 rounded-xl shrink-0" title="Ouvir explicação">
+                    <i class="ph-fill ph-speaker-high text-xl"></i>
+                </button>
+            </div>
+
+            <p id="info-description" class="text-xs sm:text-sm font-bold text-slate-600 mt-2.5 leading-relaxed">
+                Toque nos pinos numerados sobre o órgão 3D para descobrir o nome e a função de cada estrutura anatômica!
+            </p>
+
+            <!-- Curiosidade Didática -->
+            <div id="info-funfact-box" class="mt-3 bg-amber-50 border-2 border-amber-300 rounded-2xl p-2.5 flex items-center gap-2.5">
+                <span class="text-xl shrink-0">💡</span>
+                <p id="info-funfact" class="text-xs font-extrabold text-amber-900 leading-snug">
+                    O coração bate cerca de 100.000 vezes por dia, bombeando 5 litros de sangue por minuto!
+                </p>
+            </div>
+        </div>
+
+        <!-- Seletor de Órgãos (Dock Inferior) -->
+        <div class="w-full max-w-lg bg-slate-900/90 backdrop-blur-md p-2 rounded-2xl border-2 border-slate-700 flex items-center justify-around gap-1.5 pointer-events-auto overflow-x-auto no-scrollbar">
+            <button onclick="selectOrgan('heart')" id="tab-heart" class="organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all bg-rose-500 text-white border-2 border-slate-900 shadow">
+                <span>❤️</span> <span>Coração</span>
+            </button>
+            <button onclick="selectOrgan('brain')" id="tab-brain" class="organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:bg-slate-800">
+                <span>🧠</span> <span>Cérebro</span>
+            </button>
+            <button onclick="selectOrgan('lungs')" id="tab-lungs" class="organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:bg-slate-800">
+                <span>🫁</span> <span>Pulmões</span>
+            </button>
+            <button onclick="selectOrgan('stomach')" id="tab-stomach" class="organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:bg-slate-800">
+                <span>🍏</span> <span>Digestório</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- 5. MODAL TÉCNICO: ARQUITETURA PARA DESENVOLVIMENTO ANDROID -->
+    <div id="tech-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl max-h-[88vh] rounded-3xl cartoon-card flex flex-col overflow-hidden">
+            <!-- Cabeçalho Modal -->
+            <div class="bg-violet-500 text-white px-6 py-4 border-b-4 border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="ph-fill ph-android-logo text-3xl"></i>
+                    <div>
+                        <h2 class="text-lg sm:text-xl font-black leading-none">Plano de Desenvolvimento Android (RA)</h2>
+                        <p class="text-xs font-bold text-violet-100 mt-0.5">Arquitetura recomendada para publicar seu app na Google Play</p>
+                    </div>
+                </div>
+                <button onclick="toggleTechModal(false)" class="cartoon-btn bg-white text-slate-900 w-9 h-9 rounded-xl flex items-center justify-center font-black">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Conteúdo do Guia -->
+            <div class="p-5 sm:p-6 overflow-y-auto space-y-4 text-slate-700 text-sm leading-relaxed">
+                <div class="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-3.5">
+                    <h3 class="font-black text-emerald-900 text-base flex items-center gap-2">
+                        <span>🚀</span> 1. Qual tecnologia escolher? (2 Caminhos)
+                    </h3>
+                    <div class="grid sm:grid-cols-2 gap-3 mt-2">
+                        <div class="bg-white p-3 rounded-xl border border-emerald-200">
+                            <span class="font-black text-slate-800 block">Opção A: Unity + AR Foundation (Recomendado)</span>
+                            <p class="text-xs mt-1 font-semibold text-slate-600">Ideal para visual 3D estilo "desenho/cartoon" (Toon Shaders), animações orgânicas de batimento/respiração e detecção de imagens (marcadores impressos em apostilas).</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-xl border border-emerald-200">
+                            <span class="font-black text-slate-800 block">Opção B: Kotlin Nativo + Sceneview (ARCore)</span>
+                            <p class="text-xs mt-1 font-semibold text-slate-600">Usa Jetpack Compose para a interface e a biblioteca <code>io.github.sceneview:arsceneview</code> para renderizar arquivos <code>.glb</code> em RA com ótimo desempenho.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-sky-50 border-2 border-sky-300 rounded-2xl p-3.5">
+                    <h3 class="font-black text-sky-900 text-base flex items-center gap-2">
+                        <span>🎨</span> 2. Como criar os Órgãos em 3D "Estilo Desenho Amigável"?
+                    </h3>
+                    <ul class="list-disc list-inside text-xs font-bold text-slate-700 space-y-1.5 mt-2">
+                        <li><strong>Modelagem (Blender):</strong> Use formas arredondadas (Subdivision Surface) sem texturas médicas realistas/sangrentas. Prefira cores vibrantes e pastéis (como neste protótipo).</li>
+                        <li><strong>Toon Shader / Cel Shading:</strong> Aplique um material de sombreamento em 2 ou 3 tons com contorno escuro fino (Outline) para parecer uma ilustração 2D viva em 3D.</li>
+                        <li><strong>Exportação glTF / GLB:</strong> Separe cada subparte do órgão como um nó nomeado (ex: <code>Aorta_Mesh</code>, <code>Ventriculo_Esq_Mesh</code>) para detectar o toque individual (Raycasting).</li>
+                    </ul>
+                </div>
+
+                <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3.5">
+                    <h3 class="font-black text-amber-900 text-base flex items-center gap-2">
+                        <span>📲</span> 3. Fluxo de Interação em Sala de Aula (Marcador vs Superfície)
+                    </h3>
+                    <p class="text-xs font-bold text-slate-700 mt-1">
+                        Com o <strong>ARCore Augmented Images</strong>, você pode criar cartões impressos (Flashcards de Anatomia). Quando o aluno aponta a câmera para o cartão do Coração, o modelo 3D salta da folha! Caso não tenha o cartão, o <strong>Plane Detection</strong> posiciona o órgão sobre a carteira escolar.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Rodapé Modal -->
+            <div class="p-4 bg-slate-100 border-t-2 border-slate-300 flex justify-end">
+                <button onclick="toggleTechModal(false)" class="cartoon-btn bg-emerald-400 text-slate-900 font-black px-5 py-2 rounded-xl text-sm">
+                    Voltar ao Atlas 3D
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /********************************************************************
+         * 1. BANCO DE DADOS EDUCATIVO DOS ÓRGÃOS E SUAS PARTES
+         ********************************************************************/
+        const ORGANS_DATA = {
+            heart: {
+                name: "Coração Humano",
+                system: "Sistema Cardiovascular",
+                themeColor: "rose",
+                description: "O coração funciona como uma bomba muscular dupla que impulsiona o sangue cheio de oxigênio e nutrientes para todo o corpo.",
+                funFact: "Seu coração tem aproximadamente o tamanho do seu punho fechado e bate 100 mil vezes por dia!",
+                parts: [
+                    {
+                        id: "aorta",
+                        number: 1,
+                        name: "Artéria Aorta",
+                        color: "#ef4444",
+                        position: { x: 0.15, y: 1.45, z: 0.2 },
+                        explodeVec: { x: 0.1, y: 0.7, z: 0 },
+                        description: "A maior artéria do corpo humano! Ela recebe o sangue rico em oxigênio do ventrículo esquerdo e o distribui para todos os órgãos.",
+                        funFact: "O sangue sai pela aorta a uma velocidade de cerca de 30 centímetros por segundo!"
+                    },
+                    {
+                        id: "vena_cava",
+                        number: 2,
+                        name: "Veia Cava Superior",
+                        color: "#3b82f6",
+                        position: { x: -0.75, y: 1.15, z: 0.1 },
+                        explodeVec: { x: -0.6, y: 0.5, z: 0 },
+                        description: "Traz de volta para o coração o sangue pobre em oxigênio que já circulou pela cabeça, pescoço e braços.",
+                        funFact: "Representamos em azul nos desenhos educativos para diferenciar o sangue que precisa voltar aos pulmões!"
+                    },
+                    {
+                        id: "pulmonary_artery",
+                        number: 3,
+                        name: "Tronco Pulmonar",
+                        color: "#6366f1",
+                        position: { x: 0.65, y: 0.85, z: 0.55 },
+                        explodeVec: { x: 0.5, y: 0.35, z: 0.4 },
+                        description: "Leva o sangue pobre em oxigênio diretamente do coração para os pulmões, onde ele será recarregado de oxigênio fresco.",
+                        funFact: "É a única artéria do corpo que carrega sangue pobre em oxigênio!"
+                    },
+                    {
+                        id: "left_ventricle",
+                        number: 4,
+                        name: "Ventrículo Esquerdo",
+                        color: "#e11d48",
+                        position: { x: 0.55, y: -0.45, z: 0.7 },
+                        explodeVec: { x: 0.5, y: -0.35, z: 0.25 },
+                        description: "A câmara mais forte e musculosa do coração! Sua contração potente envia sangue até a ponta dos seus pés.",
+                        funFact: "A parede muscular do ventrículo esquerdo é três vezes mais espessa que a do lado direito."
+                    },
+                    {
+                        id: "right_atrium",
+                        number: 5,
+                        name: "Átrio Direito",
+                        color: "#f43f5e",
+                        position: { x: -0.8, y: 0.1, z: 0.6 },
+                        explodeVec: { x: -0.65, y: 0, z: 0.25 },
+                        description: "Funciona como a 'sala de recepção' do coração. Aqui fica o marcapasso natural que dita o ritmo dos batimentos.",
+                        funFact: "O nó sinoatrial, localizado aqui, gera pequenos impulsos elétricos automáticos!"
+                    }
+                ]
+            },
+            brain: {
+                name: "Cérebro (Encéfalo)",
+                system: "Sistema Nervoso",
+                themeColor: "pink",
+                description: "O centro de comando do corpo! Ele interpreta os sentidos, controla os movimentos, guarda memórias e cria pensamentos.",
+                funFact: "O cérebro humano possui cerca de 86 bilhões de neurônios conectados entre si!",
+                parts: [
+                    {
+                        id: "frontal_lobe",
+                        number: 1,
+                        name: "Lobo Frontal",
+                        color: "#f472b6",
+                        position: { x: 0.6, y: 0.55, z: 0.9 },
+                        explodeVec: { x: 0.35, y: 0.35, z: 0.55 },
+                        description: "Responsável pelo planejamento, raciocínio, concentração, controle das emoções e pelos movimentos voluntários do corpo.",
+                        funFact: "É a parte do cérebro que mais demora para amadurecer, continuando a se desenvolver até os 25 anos!"
+                    },
+                    {
+                        id: "parietal_lobe",
+                        number: 2,
+                        name: "Lobo Parietal",
+                        color: "#fbbf24",
+                        position: { x: -0.5, y: 0.9, z: -0.2 },
+                        explodeVec: { x: -0.35, y: 0.6, z: -0.25 },
+                        description: "Processa as sensações de tato, temperatura, dor e nos ajuda a entender o espaço ao nosso redor (noção espacial).",
+                        funFact: "Quando você lê um mapa ou resolve contas de matemática, o lobo parietal trabalha a todo vapor!"
+                    },
+                    {
+                        id: "occipital_lobe",
+                        number: 3,
+                        name: "Lobo Occipital",
+                        color: "#a78bfa",
+                        position: { x: 0.0, y: 0.2, z: -1.15 },
+                        explodeVec: { x: 0, y: 0.1, z: -0.7 },
+                        description: "O centro da visão! Ele recebe os sinais enviados pelos olhos e os transforma em imagens coloridas, formas e movimentos.",
+                        funFact: "Curiosamente, o centro da visão fica na parte de trás da cabeça, bem longe dos olhos!"
+                    },
+                    {
+                        id: "cerebellum",
+                        number: 4,
+                        name: "Cerebelo",
+                        color: "#38bdf8",
+                        position: { x: 0.0, y: -0.75, z: -0.8 },
+                        explodeVec: { x: 0, y: -0.55, z: -0.55 },
+                        description: "Garante o nosso equilíbrio, postura e a coordenação motora fina — como andar de bicicleta, dançar ou desenhar.",
+                        funFact: "Embora ocupe apenas 10% do volume do cérebro, o cerebelo concentra mais da metade de todos os neurônios!"
+                    },
+                    {
+                        id: "brainstem",
+                        number: 5,
+                        name: "Tronco Encefálico",
+                        color: "#fde047",
+                        position: { x: 0.0, y: -1.25, z: 0.1 },
+                        explodeVec: { x: 0, y: -0.75, z: 0.1 },
+                        description: "Conecta o cérebro à medula espinhal e controla funções automáticas vitais, como respiração, digestão e batimentos cardíacos.",
+                        funFact: "Graças ao tronco encefálico, você continua respirando tranquilamente mesmo enquanto dorme!"
+                    }
+                ]
+            },
+            lungs: {
+                name: "Pulmões e Vias Aéreas",
+                system: "Sistema Respiratório",
+                themeColor: "sky",
+                description: "Responsáveis pelas trocas gasosas: captam o oxigênio do ar que inspiramos e eliminam o gás carbônico produzido pelo corpo.",
+                funFact: "Se abríssemos todos os alvéolos dos pulmões em uma superfície plana, cobririam uma quadra inteira de tênis!",
+                parts: [
+                    {
+                        id: "trachea",
+                        number: 1,
+                        name: "Traqueia",
+                        color: "#38bdf8",
+                        position: { x: 0.0, y: 1.35, z: 0.2 },
+                        explodeVec: { x: 0, y: 0.65, z: 0 },
+                        description: "Um tubo reforçado por anéis de cartilagem que filtra, aquece e conduz o ar do nariz/boca até os brônquios.",
+                        funFact: "Os anéis da traqueia impedem que o tubo se feche quando viramos o pescoço!"
+                    },
+                    {
+                        id: "right_lung",
+                        number: 2,
+                        name: "Pulmão Direito",
+                        color: "#fb7185",
+                        position: { x: -0.85, y: 0.15, z: 0.45 },
+                        explodeVec: { x: -0.65, y: 0, z: 0 },
+                        description: "É ligeiramente maior que o esquerdo e dividido em 3 partes chamadas lobos (superior, médio e inferior).",
+                        funFact: "Os pulmões são os únicos órgãos do corpo humano leves e esponjosos o suficiente para flutuar na água!"
+                    },
+                    {
+                        id: "left_lung",
+                        number: 3,
+                        name: "Pulmão Esquerdo",
+                        color: "#f43f5e",
+                        position: { x: 0.85, y: 0.15, z: 0.45 },
+                        explodeVec: { x: 0.65, y: 0, z: 0 },
+                        description: "Possui apenas 2 lobos e uma pequena curvatura chamada 'incisura cardíaca' para dar espaço ao coração.",
+                        funFact: "Você respira cerca de 20.000 vezes todos os dias sem precisar pensar nisso!"
+                    },
+                    {
+                        id: "bronchi",
+                        number: 4,
+                        name: "Árvore Brônquica",
+                        color: "#60a5fa",
+                        position: { x: 0.35, y: 0.35, z: 0.5 },
+                        explodeVec: { x: 0, y: 0.2, z: 0.6 },
+                        description: "Ramificações internas que parecem galhos de árvore, levando o ar até milhões de bolsinhas microscópicas (alvéolos).",
+                        funFact: "Nos alvéolos, o oxigênio passa direto do ar para os glóbulos vermelhos do sangue!"
+                    },
+                    {
+                        id: "diaphragm",
+                        number: 5,
+                        name: "Músculo Diafragma",
+                        color: "#d97706",
+                        position: { x: 0.0, y: -1.1, z: 0.35 },
+                        explodeVec: { x: 0, y: -0.65, z: 0 },
+                        description: "O principal músculo da respiração! Quando ele desce, puxa o ar para dentro; quando sobe, empurra o ar para fora.",
+                        funFact: "Sabe o que é o soluço? São pequenas contrações involuntárias e rápidas do diafragma!"
+                    }
+                ]
+            },
+            stomach: {
+                name: "Estômago (Digestão)",
+                system: "Sistema Digestório",
+                themeColor: "amber",
+                description: "Uma bolsa muscular elástica em forma de 'J' que mistura os alimentos com o suco gástrico para transformá-los em nutrientes.",
+                funFact: "Seu estômago produz uma camada nova de muco protetor a cada duas semanas para não digerir a si mesmo!",
+                parts: [
+                    {
+                        id: "esophagus",
+                        number: 1,
+                        name: "Esôfago e Cárdia",
+                        color: "#fb923c",
+                        position: { x: 0.35, y: 1.35, z: 0.15 },
+                        explodeVec: { x: 0.2, y: 0.65, z: 0 },
+                        description: "Canal muscular que traz o alimento mastigado da boca até o estômago através de ondas suaves chamadas movimentos peristálticos.",
+                        funFact: "Graças aos movimentos peristálticos, a comida chegaria ao estômago mesmo se você estivesse de ponta-cabeça!"
+                    },
+                    {
+                        id: "fundus",
+                        number: 2,
+                        name: "Fundo Gástrico",
+                        color: "#f97316",
+                        position: { x: 0.85, y: 0.8, z: 0.35 },
+                        explodeVec: { x: 0.55, y: 0.45, z: 0 },
+                        description: "A cúpula arredondada superior do estômago, que acumula gases produzidos durante a digestão e armazena alimento.",
+                        funFact: "Um estômago adulto vazio tem o volume de apenas 50 ml, mas pode expandir para comportar até 1,5 litro!"
+                    },
+                    {
+                        id: "body_rugae",
+                        number: 3,
+                        name: "Corpo e Pregas Gástricas",
+                        color: "#f59e0b",
+                        position: { x: 0.25, y: -0.1, z: 0.7 },
+                        explodeVec: { x: 0.2, y: 0, z: 0.55 },
+                        description: "Grande região central revestida por dobrinhas internas (pregas) que se esticam quando comemos e secretam enzimas digestivas.",
+                        funFact: "O ronco na barriga acontece quando as paredes do estômago se contraem misturando ar e líquidos!"
+                    },
+                    {
+                        id: "pylorus",
+                        number: 4,
+                        name: "Antro e Piloro",
+                        color: "#eab308",
+                        position: { x: -0.65, y: -0.65, z: 0.4 },
+                        explodeVec: { x: -0.5, y: -0.35, z: 0.2 },
+                        description: "O piloro funciona como um 'portão inteligente' muscular que libera o alimento digerido aos poucos para o intestino.",
+                        funFact: "Ele só deixa passar partículas bem pequenininhas, menores que 2 milímetros!"
+                    },
+                    {
+                        id: "duodenum",
+                        number: 5,
+                        name: "Duodeno (Intestino)",
+                        color: "#10b981",
+                        position: { x: -0.95, y: -0.2, z: 0.1 },
+                        explodeVec: { x: -0.7, y: -0.1, z: 0 },
+                        description: "A primeira parte do intestino delgado, onde o alimento recebe auxiliares do fígado e do pâncreas para absorver os nutrientes.",
+                        funFact: "O nome 'duodeno' vem do latim e significa que seu comprimento equivale à largura de 12 dedos juntos!"
+                    }
+                ]
+            }
+        };
+
+        /********************************************************************
+         * 2. CONFIGURAÇÃO DA CENA 3D (THREE.JS) E ESTILO CARTOON/EDUCATIVO
+         ********************************************************************/
+        let scene, camera, renderer, organGroup;
+        let currentOrganKey = 'heart';
+        let partMeshes = []; // Lista de grupos/malhas clicáveis com metadados
+        let hotspotsDOM = []; // Elementos HTML de pinos numerados
+        let isExploded = false;
+        let showHotspots = true;
+        let isAnimating = true;
+        let selectedPartId = null;
+
+        // Estado do Modo Quiz
+        let isQuizMode = false;
+        let currentQuizTarget = null;
+        let quizScore = 0;
+
+        // Controle de Rotação Touch / Mouse
+        let isDragging = false;
+        let prevPointer = { x: 0, y: 0 };
+        let targetRotation = { x: 0.15, y: -0.3 };
+        let currentScale = 1;
+
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        // Cria uma textura gradiente em degraus para o efeito Toon Shader (Desenho 3D)
+        function createToonGradientMap() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 4;
+            canvas.height = 1;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#475569'; ctx.fillRect(0, 0, 1, 1);
+            ctx.fillStyle = '#94a3b8'; ctx.fillRect(1, 0, 1, 1);
+            ctx.fillStyle = '#e2e8f0'; ctx.fillRect(2, 0, 1, 1);
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(3, 0, 1, 1);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.NearestFilter;
+            texture.magFilter = THREE.NearestFilter;
+            return texture;
+        }
+
+        let toonGradientMap;
+
+        function createCartoonMaterial(hexColor) {
+            return new THREE.MeshToonMaterial({
+                color: new THREE.Color(hexColor),
+                gradientMap: toonGradientMap
+            });
+        }
+
+        // Adiciona contorno estilo desenho animado (Outline invertido) à geometria
+        function addCartoonMeshWithOutline(geometry, hexColor, parentGroup, partId) {
+            const container = new THREE.Group();
+            
+            const mainMat = createCartoonMaterial(hexColor);
+            const mainMesh = new THREE.Mesh(geometry, mainMat);
+            mainMesh.userData = { partId: partId, baseColor: hexColor };
+            container.add(mainMesh);
+
+            // Contorno escuro (BackSide)
+            const outlineMat = new THREE.MeshBasicMaterial({
+                color: 0x1e293b,
+                side: THREE.BackSide
+            });
+            const outlineMesh = new THREE.Mesh(geometry, outlineMat);
+            outlineMesh.scale.multiplyScalar(1.06);
+            container.add(outlineMesh);
+
+            parentGroup.add(container);
+            return mainMesh;
+        }
+
+        // Adiciona olhinhos amigáveis estilo Mascote Educativo ao órgão
+        function createFriendlyFace(x, y, z, scale = 1) {
+            const faceGroup = new THREE.Group();
+            faceGroup.position.set(x, y, z);
+            faceGroup.scale.setScalar(scale);
+
+            const eyeGeo = new THREE.SphereGeometry(0.09, 16, 16);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+            const shineGeo = new THREE.SphereGeometry(0.035, 12, 12);
+            const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            // Olho Esquerdo
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.22, 0.08, 0);
+            const leftShine = new THREE.Mesh(shineGeo, shineMat);
+            leftShine.position.set(-0.19, 0.11, 0.07);
+            faceGroup.add(leftEye, leftShine);
+
+            // Olho Direito
+            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(0.22, 0.08, 0);
+            const rightShine = new THREE.Mesh(shineGeo, shineMat);
+            rightShine.position.set(0.25, 0.11, 0.07);
+            faceGroup.add(rightEye, rightShine);
+
+            // Bochechas rosadas
+            const cheekGeo = new THREE.SphereGeometry(0.065, 12, 12);
+            const cheekMat = new THREE.MeshBasicMaterial({ color: 0xff8fab });
+            const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
+            leftCheek.scale.set(1.3, 0.7, 0.5);
+            leftCheek.position.set(-0.34, -0.02, 0.02);
+            const rightCheek = leftCheek.clone();
+            rightCheek.position.set(0.34, -0.02, 0.02);
+            faceGroup.add(leftCheek, rightCheek);
+
+            // Sorriso amigável
+            const smileGeo = new THREE.TorusGeometry(0.09, 0.025, 12, 24, Math.PI);
+            const smileMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+            const smile = new THREE.Mesh(smileGeo, smileMat);
+            smile.rotation.x = Math.PI;
+            smile.position.set(0, 0.02, 0.03);
+            faceGroup.add(smile);
+
+            return faceGroup;
+        }
+
+        /********************************************************************
+         * 3. CONSTRUTORES DE MODELOS 3D PROCEDURAIS ESTILO CARTOON
+         ********************************************************************/
+        
+        function buildCartoonHeart() {
+            const root = new THREE.Group();
+
+            // 4. Ventrículo Esquerdo (Corpo principal arredondado)
+            const lvGroup = new THREE.Group();
+            const lvGeo = new THREE.SphereGeometry(0.95, 32, 32);
+            lvGeo.scale(0.95, 1.25, 0.85);
+            addCartoonMeshWithOutline(lvGeo, "#e11d48", lvGroup, "left_ventricle");
+            lvGroup.add(createFriendlyFace(0.15, -0.1, 0.82, 0.95));
+            registerPartGroup(lvGroup, "left_ventricle", root);
+
+            // 5. Átrio Direito (Câmara lateral arredondada)
+            const raGroup = new THREE.Group();
+            const raGeo = new THREE.SphereGeometry(0.62, 28, 28);
+            raGeo.scale(0.9, 1.05, 0.85);
+            const raMesh = addCartoonMeshWithOutline(raGeo, "#f43f5e", raGroup, "right_atrium");
+            raGroup.position.set(-0.55, 0.15, 0.05);
+            registerPartGroup(raGroup, "right_atrium", root);
+
+            // 1. Artéria Aorta (Arco superior com 3 saídas)
+            const aortaGroup = new THREE.Group();
+            const archGeo = new THREE.TorusGeometry(0.55, 0.24, 20, 40, Math.PI * 1.15);
+            addCartoonMeshWithOutline(archGeo, "#ef4444", aortaGroup, "aorta");
+            
+            // Três raminhos superiores da aorta
+            [-0.25, 0, 0.25].forEach((offsetX, idx) => {
+                const branchGeo = new THREE.CylinderGeometry(0.09, 0.1, 0.45, 16);
+                branchGeo.translate(offsetX, 0.68 - Math.abs(offsetX) * 0.2, 0);
+                addCartoonMeshWithOutline(branchGeo, "#ef4444", aortaGroup, "aorta");
+            });
+            aortaGroup.position.set(0.1, 0.72, -0.05);
+            registerPartGroup(aortaGroup, "aorta", root);
+
+            // 2. Veia Cava Superior (Tubo azul à esquerda)
+            const vcGroup = new THREE.Group();
+            const vcGeo = new THREE.CylinderGeometry(0.22, 0.22, 1.05, 24);
+            addCartoonMeshWithOutline(vcGeo, "#3b82f6", vcGroup, "vena_cava");
+            const vcRingGeo = new THREE.TorusGeometry(0.22, 0.05, 12, 24);
+            vcRingGeo.rotateX(Math.PI / 2);
+            vcRingGeo.translate(0, 0.52, 0);
+            addCartoonMeshWithOutline(vcRingGeo, "#2563eb", vcGroup, "vena_cava");
+            vcGroup.position.set(-0.68, 0.82, -0.05);
+            vcGroup.rotation.z = 0.15;
+            registerPartGroup(vcGroup, "vena_cava", root);
+
+            // 3. Tronco Pulmonar (Tubo violeta frontal cruzando)
+            const paGroup = new THREE.Group();
+            const paGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.9, 24);
+            paGeo.rotateZ(-0.55);
+            addCartoonMeshWithOutline(paGeo, "#6366f1", paGroup, "pulmonary_artery");
+            paGroup.position.set(0.35, 0.65, 0.38);
+            registerPartGroup(paGroup, "pulmonary_artery", root);
+
+            return root;
+        }
+
+        function buildCartoonBrain() {
+            const root = new THREE.Group();
+
+            // 1. Lobo Frontal (Frente rosada com esferas macias)
+            const frontalGroup = new THREE.Group();
+            const fGeo1 = new THREE.SphereGeometry(0.75, 28, 28);
+            fGeo1.scale(1.15, 0.95, 1.0);
+            fGeo1.translate(0, 0.35, 0.45);
+            addCartoonMeshWithOutline(fGeo1, "#f472b6", frontalGroup, "frontal_lobe");
+            frontalGroup.add(createFriendlyFace(0, 0.32, 1.22, 0.9));
+            registerPartGroup(frontalGroup, "frontal_lobe", root);
+
+            // 2. Lobo Parietal (Topo amarelo)
+            const parietalGroup = new THREE.Group();
+            const pGeo = new THREE.SphereGeometry(0.78, 28, 28);
+            pGeo.scale(1.18, 0.9, 1.0);
+            pGeo.translate(0, 0.55, -0.25);
+            addCartoonMeshWithOutline(pGeo, "#fbbf24", parietalGroup, "parietal_lobe");
+            registerPartGroup(parietalGroup, "parietal_lobe", root);
+
+            // 3. Lobo Occipital (Parte posterior lilás)
+            const occipitalGroup = new THREE.Group();
+            const oGeo = new THREE.SphereGeometry(0.62, 24, 24);
+            oGeo.scale(1.1, 0.85, 0.95);
+            oGeo.translate(0, 0.1, -0.75);
+            addCartoonMeshWithOutline(oGeo, "#a78bfa", occipitalGroup, "occipital_lobe");
+            registerPartGroup(occipitalGroup, "occipital_lobe", root);
+
+            // 4. Cerebelo (Base traseira azul clara)
+            const cerebellumGroup = new THREE.Group();
+            const cGeo = new THREE.SphereGeometry(0.5, 24, 24);
+            cGeo.scale(1.35, 0.75, 0.9);
+            cGeo.translate(0, -0.58, -0.58);
+            addCartoonMeshWithOutline(cGeo, "#38bdf8", cerebellumGroup, "cerebellum");
+            registerPartGroup(cerebellumGroup, "cerebellum", root);
+
+            // 5. Tronco Encefálico (Cilindro inferior amarelo claro)
+            const stemGroup = new THREE.Group();
+            const sGeo = new THREE.CylinderGeometry(0.26, 0.2, 0.95, 20);
+            sGeo.rotateX(0.2);
+            sGeo.translate(0, -0.95, -0.05);
+            addCartoonMeshWithOutline(sGeo, "#fde047", stemGroup, "brainstem");
+            registerPartGroup(stemGroup, "brainstem", root);
+
+            return root;
+        }
+
+        function buildCartoonLungs() {
+            const root = new THREE.Group();
+
+            // 1. Traqueia com anéis cartilaginosos
+            const tracheaGroup = new THREE.Group();
+            const tGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.1, 24);
+            tGeo.translate(0, 1.05, 0);
+            addCartoonMeshWithOutline(tGeo, "#38bdf8", tracheaGroup, "trachea");
+            for (let i = 0; i < 4; i++) {
+                const ring = new THREE.TorusGeometry(0.21, 0.04, 10, 24);
+                ring.rotateX(Math.PI / 2);
+                ring.translate(0, 0.75 + i * 0.22, 0);
+                addCartoonMeshWithOutline(ring, "#bae6fd", tracheaGroup, "trachea");
+            }
+            registerPartGroup(tracheaGroup, "trachea", root);
+
+            // 2. Pulmão Direito
+            const rLungGroup = new THREE.Group();
+            const rlGeo = new THREE.SphereGeometry(0.72, 28, 28);
+            rlGeo.scale(0.82, 1.45, 0.78);
+            rlGeo.rotateZ(-0.15);
+            rlGeo.translate(-0.75, 0.05, 0);
+            addCartoonMeshWithOutline(rlGeo, "#fb7185", rLungGroup, "right_lung");
+            rLungGroup.add(createFriendlyFace(-0.75, 0.15, 0.58, 0.75));
+            registerPartGroup(rLungGroup, "right_lung", root);
+
+            // 3. Pulmão Esquerdo
+            const lLungGroup = new THREE.Group();
+            const llGeo = new THREE.SphereGeometry(0.68, 28, 28);
+            llGeo.scale(0.8, 1.4, 0.78);
+            llGeo.rotateZ(0.15);
+            llGeo.translate(0.75, 0.05, 0);
+            addCartoonMeshWithOutline(llGeo, "#f43f5e", lLungGroup, "left_lung");
+            lLungGroup.add(createFriendlyFace(0.75, 0.15, 0.56, 0.75));
+            registerPartGroup(lLungGroup, "left_lung", root);
+
+            // 4. Árvore Brônquica central
+            const bronchiGroup = new THREE.Group();
+            const bLeft = new THREE.CylinderGeometry(0.12, 0.09, 0.75, 16);
+            bLeft.rotateZ(0.85);
+            bLeft.translate(0.3, 0.4, 0.15);
+            addCartoonMeshWithOutline(bLeft, "#60a5fa", bronchiGroup, "bronchi");
+            const bRight = new THREE.CylinderGeometry(0.12, 0.09, 0.75, 16);
+            bRight.rotateZ(-0.85);
+            bRight.translate(-0.3, 0.4, 0.15);
+            addCartoonMeshWithOutline(bRight, "#60a5fa", bronchiGroup, "bronchi");
+            registerPartGroup(bronchiGroup, "bronchi", root);
+
+            // 5. Diafragma (Cúpula muscular abaixo dos pulmões)
+            const diaGroup = new THREE.Group();
+            const dGeo = new THREE.TorusGeometry(1.15, 0.22, 16, 36, Math.PI);
+            dGeo.scale(1.0, 0.45, 0.8);
+            dGeo.translate(0, -1.15, 0);
+            addCartoonMeshWithOutline(dGeo, "#d97706", diaGroup, "diaphragm");
+            registerPartGroup(diaGroup, "diaphragm", root);
+
+            return root;
+        }
+
+        function buildCartoonStomach() {
+            const root = new THREE.Group();
+
+            // 1. Esôfago
+            const esoGroup = new THREE.Group();
+            const esoGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.95, 20);
+            esoGeo.rotateZ(-0.15);
+            esoGeo.translate(0.28, 1.15, 0);
+            addCartoonMeshWithOutline(esoGeo, "#fb923c", esoGroup, "esophagus");
+            registerPartGroup(esoGroup, "esophagus", root);
+
+            // 2. Fundo Gástrico (Cúpula arredondada)
+            const fundusGroup = new THREE.Group();
+            const funGeo = new THREE.SphereGeometry(0.65, 28, 28);
+            funGeo.scale(1.0, 0.95, 0.85);
+            funGeo.translate(0.65, 0.55, 0);
+            addCartoonMeshWithOutline(funGeo, "#f97316", fundusGroup, "fundus");
+            registerPartGroup(fundusGroup, "fundus", root);
+
+            // 3. Corpo Gástrico (Curvatura principal em J)
+            const bodyGroup = new THREE.Group();
+            const bodyGeo = new THREE.SphereGeometry(0.82, 32, 32);
+            bodyGeo.scale(0.88, 1.25, 0.82);
+            bodyGeo.rotateZ(-0.35);
+            bodyGeo.translate(0.35, -0.1, 0);
+            addCartoonMeshWithOutline(bodyGeo, "#f59e0b", bodyGroup, "body_rugae");
+            bodyGroup.add(createFriendlyFace(0.35, -0.05, 0.69, 0.9));
+            registerPartGroup(bodyGroup, "body_rugae", root);
+
+            // 4. Antro e Piloro
+            const pylorusGroup = new THREE.Group();
+            const pylGeo = new THREE.SphereGeometry(0.52, 24, 24);
+            pylGeo.scale(1.25, 0.8, 0.8);
+            pylGeo.rotateZ(0.35);
+            pylGeo.translate(-0.42, -0.62, 0);
+            addCartoonMeshWithOutline(pylGeo, "#eab308", pylorusGroup, "pylorus");
+            registerPartGroup(pylorusGroup, "pylorus", root);
+
+            // 5. Duodeno (Curva verde inicial do intestino)
+            const duoGroup = new THREE.Group();
+            const duoGeo = new THREE.TorusGeometry(0.45, 0.22, 16, 28, Math.PI * 1.1);
+            duoGeo.rotateZ(Math.PI / 2);
+            duoGeo.translate(-0.85, -0.35, 0);
+            addCartoonMeshWithOutline(duoGeo, "#10b981", duoGroup, "duodenum");
+            registerPartGroup(duoGroup, "duodenum", root);
+
+            return root;
+        }
+
+        function registerPartGroup(group, partId, root) {
+            const organData = ORGANS_DATA[currentOrganKey];
+            const partInfo = organData.parts.find(p => p.id === partId);
+            group.userData = {
+                partId: partId,
+                originPos: group.position.clone(),
+                explodeVec: partInfo ? new THREE.Vector3(partInfo.explodeVec.x, partInfo.explodeVec.y, partInfo.explodeVec.z) : new THREE.Vector3()
+            };
+            root.add(group);
+            partMeshes.push(group);
+        }
+
+        /********************************************************************
+         * 4. GERENCIAMENTO DE ÓRGÃOS, HOTSPOTS E INTERAÇÃO
+         ********************************************************************/
+        function loadOrganModel(organKey) {
+            currentOrganKey = organKey;
+            selectedPartId = null;
+            isExploded = false;
+            updateExplodeBtnUI();
+
+            // Limpa órgão anterior
+            if (organGroup) {
+                scene.remove(organGroup);
+            }
+            partMeshes = [];
+
+            // Constrói novo órgão
+            if (organKey === 'heart') organGroup = buildCartoonHeart();
+            else if (organKey === 'brain') organGroup = buildCartoonBrain();
+            else if (organKey === 'lungs') organGroup = buildCartoonLungs();
+            else if (organKey === 'stomach') organGroup = buildCartoonStomach();
+
+            // Posiciona ligeiramente acima para ficar livre do card inferior em telas mobile
+            organGroup.position.set(0, 0.35, 0);
+            scene.add(organGroup);
+
+            // Cria os pinos numerados (Hotspots HTML)
+            buildHotspotsDOM();
+
+            // Atualiza Card de Informações com visão geral do órgão
+            const data = ORGANS_DATA[organKey];
+            updateInfoCard({
+                badge: "3D",
+                system: data.system,
+                title: data.name,
+                description: data.description,
+                funFact: data.funFact,
+                color: "#f43f5e"
+            });
+
+            // Se estiver em modo Quiz, sorteia pergunta deste órgão
+            if (isQuizMode) {
+                pickNextQuizQuestion();
+            }
+        }
+
+        function buildHotspotsDOM() {
+            const container = document.getElementById('hotspots-container');
+            container.innerHTML = '';
+            hotspotsDOM = [];
+
+            const organData = ORGANS_DATA[currentOrganKey];
+            organData.parts.forEach(part => {
+                const pin = document.createElement('div');
+                pin.className = `hotspot ${showHotspots ? '' : 'hidden'}`;
+                pin.innerHTML = `
+                    <div class="relative flex items-center justify-center">
+                        <div class="w-9 h-9 rounded-full hotspot-pulse absolute" style="background-color: ${part.color}"></div>
+                        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full text-white font-black text-xs sm:text-sm flex items-center justify-center border-2 border-slate-900 shadow-md relative z-10"
+                             style="background-color: ${part.color}">
+                            ${part.number}
+                        </div>
+                    </div>
+                `;
+                pin.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handlePartSelection(part.id);
+                });
+                container.appendChild(pin);
+
+                hotspotsDOM.push({
+                    id: part.id,
+                    element: pin,
+                    localPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z),
+                    explodeVec: new THREE.Vector3(part.explodeVec.x, part.explodeVec.y, part.explodeVec.z)
+                });
+            });
+        }
+
+        function handlePartSelection(partId) {
+            const organData = ORGANS_DATA[currentOrganKey];
+            const part = organData.parts.find(p => p.id === partId);
+            if (!part) return;
+
+            selectedPartId = partId;
+
+            // Verifica se o Modo Quiz está ativo
+            if (isQuizMode && currentQuizTarget) {
+                const feedbackEl = document.getElementById('quiz-feedback');
+                feedbackEl.classList.remove('hidden');
+                if (part.id === currentQuizTarget.id) {
+                    quizScore += 10;
+                    document.getElementById('quiz-score').innerText = quizScore;
+                    feedbackEl.innerText = `🎉 Acertou! Esse é o(a) ${part.name}! +10 pontos`;
+                    feedbackEl.className = "text-xs font-black mt-1.5 text-emerald-800 bg-emerald-200 px-2.5 py-1 rounded-lg";
+                    setTimeout(() => {
+                        if (isQuizMode) pickNextQuizQuestion();
+                    }, 1600);
+                } else {
+                    feedbackEl.innerText = `❌ Quase! Você tocou em: ${part.name}. Tente novamente!`;
+                    feedbackEl.className = "text-xs font-black mt-1.5 text-rose-800 bg-rose-200 px-2.5 py-1 rounded-lg";
+                }
+            }
+
+            // Destaca visualmente a parte selecionada no modelo 3D
+            partMeshes.forEach(group => {
+                const isSelected = group.userData.partId === partId;
+                group.traverse(child => {
+                    if (child.isMesh && child.userData.baseColor) {
+                        child.material.emissive = isSelected ? new THREE.Color(0x444444) : new THREE.Color(0x000000);
+                    }
+                });
+            });
+
+            // Destaca o pino correspondente
+            hotspotsDOM.forEach(h => {
+                if (h.id === partId) h.element.classList.add('active');
+                else h.element.classList.remove('active');
+            });
+
+            // Atualiza Card de Informações
+            updateInfoCard({
+                badge: part.number,
+                system: organData.system,
+                title: part.name,
+                description: part.description,
+                funFact: part.funFact,
+                color: part.color
+            });
+        }
+
+        function updateInfoCard({ badge, system, title, description, funFact, color }) {
+            const badgeEl = document.getElementById('info-badge');
+            badgeEl.innerText = badge;
+            badgeEl.style.backgroundColor = color || '#f43f5e';
+
+            document.getElementById('info-system-tag').innerText = system;
+            document.getElementById('info-title').innerText = title;
+            document.getElementById('info-description').innerText = description;
+            document.getElementById('info-funfact').innerText = funFact;
+        }
+
+        /********************************************************************
+         * 5. FUNÇÕES DE INTERFACE (QUIZ, CÂMERA REAL, VOZ, EXPLODIR)
+         ********************************************************************/
+        function selectOrgan(organKey) {
+            document.querySelectorAll('.organ-tab').forEach(btn => {
+                btn.className = "organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:bg-slate-800";
+            });
+            const activeTab = document.getElementById(`tab-${organKey}`);
+            activeTab.className = "organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all bg-rose-500 text-white border-2 border-slate-900 shadow";
+            
+            loadOrganModel(organKey);
+        }
+
+        function toggleExplodeView() {
+            isExploded = !isExploded;
+            updateExplodeBtnUI();
+        }
+
+        function updateExplodeBtnUI() {
+            const btn = document.getElementById('btn-explode');
+            if (isExploded) {
+                btn.classList.remove('bg-white');
+                btn.classList.add('bg-amber-400');
+            } else {
+                btn.classList.remove('bg-amber-400');
+                btn.classList.add('bg-white');
+            }
+        }
+
+        function toggleHotspots() {
+            showHotspots = !showHotspots;
+            const btn = document.getElementById('btn-hotspots');
+            btn.classList.toggle('bg-emerald-400', showHotspots);
+            btn.classList.toggle('bg-white', !showHotspots);
+            hotspotsDOM.forEach(h => {
+                h.element.classList.toggle('hidden', !showHotspots);
+            });
+        }
+
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+            const btn = document.getElementById('btn-anim');
+            btn.classList.toggle('bg-rose-400', isAnimating);
+            btn.classList.toggle('bg-white', !isAnimating);
+        }
+
+        function resetCameraView() {
+            targetRotation = { x: 0.15, y: -0.3 };
+            currentScale = 1;
+            if (organGroup) organGroup.scale.setScalar(1);
+        }
+
+        // Modo Desafio Quiz
+        function toggleQuizMode() {
+            isQuizMode = !isQuizMode;
+            const banner = document.getElementById('quiz-banner');
+            const btn = document.getElementById('btn-quiz');
+
+            if (isQuizMode) {
+                banner.classList.remove('hidden');
+                btn.classList.replace('bg-amber-400', 'bg-emerald-400');
+                document.getElementById('quiz-btn-text').innerText = "Sair do Quiz";
+                pickNextQuizQuestion();
+            } else {
+                banner.classList.add('hidden');
+                btn.classList.replace('bg-emerald-400', 'bg-amber-400');
+                document.getElementById('quiz-btn-text').innerText = "Desafio Quiz";
+            }
+        }
+
+        function pickNextQuizQuestion() {
+            const parts = ORGANS_DATA[currentOrganKey].parts;
+            const randomIndex = Math.floor(Math.random() * parts.length);
+            currentQuizTarget = parts[randomIndex];
+            document.getElementById('quiz-question-target').innerText = `Onde está: ${currentQuizTarget.name}?`;
+            document.getElementById('quiz-feedback').classList.add('hidden');
+        }
+
+        // Leitura em Voz Alta (Acessibilidade & Didática)
+        function speakCurrentInfo() {
+            if (!('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const title = document.getElementById('info-title').innerText;
+            const desc = document.getElementById('info-description').innerText;
+            const fact = document.getElementById('info-funfact').innerText;
+            const utterance = new SpeechSynthesisUtterance(`${title}. ${desc}. Curiosidade: ${fact}`);
+            utterance.lang = 'pt-BR';
+            utterance.rate = 1.05;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Ativar Câmera Real WebRTC para experiência RA
+        let mediaStream = null;
+        async function toggleCamera() {
+            const videoEl = document.getElementById('camera-stream');
+            const btnText = document.getElementById('camera-btn-text');
+
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                videoEl.classList.add('hidden');
+                btnText.innerText = "Usar Câmera Real";
+                return;
+            }
+
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                videoEl.srcObject = mediaStream;
+                await videoEl.play();
+                videoEl.classList.remove('hidden');
+                btnText.innerText = "Modo Simulador";
+            } catch (err) {
+                // Caso esteja em iframe sem permissão de câmera ou desktop sem webcam, exibe aviso amigável no card
+                updateInfoCard({
+                    badge: "📷",
+                    system: "Simulador RA Ativo",
+                    title: "Câmera Simulada em Execução",
+                    description: "A permissão da câmera física não está disponível neste ambiente de visualização, então mantivemos o marcador de superfície RA virtual ativo!",
+                    funFact: "No aplicativo Android final com ARCore, a câmera traseira detecta mesas e cartões impressos instantaneamente.",
+                    color: "#0ea5e9"
+                });
+            }
+        }
+
+        function toggleTechModal(show) {
+            const modal = document.getElementById('tech-modal');
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        /********************************************************************
+         * 6. INICIALIZAÇÃO DO THREE.JS, EVENTOS E LOOP DE ANIMAÇÃO
+         ********************************************************************/
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0.4, 5.2);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            toonGradientMap = createToonGradientMap();
+
+            // Iluminação vibrante para destacar o Toon Shader
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
+            dirLight.position.set(4, 6, 5);
+            scene.add(dirLight);
+
+            const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.4);
+            rimLight.position.set(-4, -3, -2);
+            scene.add(rimLight);
+
+            // Carrega o Coração inicialmente
+            loadOrganModel('heart');
+
+            // Eventos de Interação Touch e Mouse
+            const domElem = renderer.domElement;
+            domElem.addEventListener('pointerdown', onPointerDown);
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+            domElem.addEventListener('wheel', onMouseWheel, { passive: true });
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        let pointerDownPos = { x: 0, y: 0 };
+
+        function onPointerDown(e) {
+            isDragging = true;
+            prevPointer = { x: e.clientX, y: e.clientY };
+            pointerDownPos = { x: e.clientX, y: e.clientY };
+        }
+
+        function onPointerMove(e) {
+            if (!isDragging) return;
+            const deltaX = e.clientX - prevPointer.x;
+            const deltaY = e.clientY - prevPointer.y;
+
+            targetRotation.y += deltaX * 0.009;
+            targetRotation.x = Math.max(-1.1, Math.min(1.1, targetRotation.x + deltaY * 0.009));
+
+            prevPointer = { x: e.clientX, y: e.clientY };
+        }
+
+        function onPointerUp(e) {
+            if (!isDragging) return;
+            isDragging = false;
+
+            // Se o movimento foi mínimo, interpreta como um Toque/Clique (Raycast 3D)
+            const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            if (moveDist < 6) {
+                checkRaycastSelection(e.clientX, e.clientY);
+            }
+        }
+
+        function onMouseWheel(e) {
+            currentScale = Math.max(0.65, Math.min(1.45, currentScale - e.deltaY * 0.001));
+        }
+
+        function checkRaycastSelection(clientX, clientY) {
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(organGroup.children, true);
+
+            for (let i = 0; i < intersects.length; i++) {
+                const obj = intersects[i].object;
+                if (obj.userData && obj.userData.partId) {
+                    handlePartSelection(obj.userData.partId);
+                    break;
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Loop Principal de Animação Fisiológica e Projeção 2D dos Pinos
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+
+            if (organGroup) {
+                // Suaviza rotação interativa
+                organGroup.rotation.y += (targetRotation.y - organGroup.rotation.y) * 0.12;
+                organGroup.rotation.x += (targetRotation.x - organGroup.rotation.x) * 0.12;
+
+                // Animação fisiológica específica de cada órgão
+                let physiologicalPulse = 1;
+                if (isAnimating) {
+                    if (currentOrganKey === 'heart') {
+                        // Batimento cardíaco duplo (Lub-Dub)
+                        const beat = Math.pow(Math.sin(elapsed * 3.8), 6) * 0.065;
+                        physiologicalPulse = 1 + beat;
+                    } else if (currentOrganKey === 'lungs') {
+                        // Movimento suave de inspiração e expiração
+                        physiologicalPulse = 1 + Math.sin(elapsed * 1.8) * 0.055;
+                    } else if (currentOrganKey === 'brain') {
+                        // Flutuação suave mental
+                        organGroup.position.y = 0.35 + Math.sin(elapsed * 2.0) * 0.06;
+                    } else if (currentOrganKey === 'stomach') {
+                        // Ondulação digestiva
+                        physiologicalPulse = 1 + Math.sin(elapsed * 2.5) * 0.035;
+                    }
+                }
+
+                organGroup.scale.setScalar(currentScale * physiologicalPulse);
+
+                // Animação de Explodir/Separar as partes anatômicas
+                partMeshes.forEach(group => {
+                    const targetPos = isExploded
+                        ? group.userData.originPos.clone().add(group.userData.explodeVec)
+                        : group.userData.originPos;
+                    group.position.lerp(targetPos, 0.1);
+                });
+
+                // Atualiza a posição 2D na tela de cada Pino 3D (Hotspot)
+                hotspotsDOM.forEach(h => {
+                    const worldPos = h.localPos.clone();
+                    if (isExploded) {
+                        worldPos.add(h.explodeVec);
+                    }
+                    organGroup.localToWorld(worldPos);
+                    worldPos.project(camera);
+
+                    const screenX = (worldPos.x * 0.5 + 0.5) * window.innerWidth;
+                    const screenY = (-(worldPos.y * 0.5) + 0.5) * window.innerHeight;
+
+                    h.element.style.left = `${screenX}px`;
+                    h.element.style.top = `${screenY}px`;
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            initThreeJS();
+            animate();
+        };
+    </script>
+</body>
+</html>
