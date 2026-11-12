@@ -8,10 +8,10 @@
     "copy:vendor": "node scripts/copy-vendor.mjs",
     "build": "node scripts/prepare-offline.mjs && node scripts/copy-vendor.mjs && vite build .offline-build --config vite.config.js",
     "preview": "vite preview --outDir dist --host 0.0.0.0",
-    "android:add": "cap add android",
-    "android:sync": "npm run build && cap sync android",
+    "android:add": "cap add android && node scripts/prepare-android.mjs",
+    "android:sync": "npm run build && cap sync android && node scripts/prepare-android.mjs",
     "android:open": "cap open android",
-    "android:apk": "npm run build && cap sync android && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run build && cap sync android && node scripts/prepare-android.mjs && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor/android": "8.6.0",
