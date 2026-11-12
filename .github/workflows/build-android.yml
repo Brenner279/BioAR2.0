@@ -67,32 +67,7 @@ jobs:
         run: npx cap sync android
 
       - name: Configure offline camera permission
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          manifest = Path("android/app/src/main/AndroidManifest.xml")
-          content = manifest.read_text(encoding="utf-8")
-
-          # A aplicação usa apenas arquivos locais. Remova a permissão de rede
-          # para impedir requisições externas durante a execução.
-          content = re.sub(
-              r'\s*<uses-permission[^>]*android:name="android\.permission\.INTERNET"[^>]*/>',
-              '',
-              content
-          )
-
-          camera_permission = '    <uses-permission android:name="android.permission.CAMERA" />'
-          camera_feature = '    <uses-feature android:name="android.hardware.camera.any" android:required="false" />'
-
-          if "android.permission.CAMERA" not in content:
-              content = content.replace("<application", camera_permission + "\n" + camera_feature + "\n\n    <application", 1)
-
-          manifest.write_text(content, encoding="utf-8")
-          print("Manifesto Android configurado para câmera e sem permissão de internet.")
-          PY
+        run: node scripts/prepare-android.mjs
 
       - name: Build installable debug APK
         run: |
