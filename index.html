@@ -1194,13 +1194,13 @@
                 videoEl.classList.remove('hidden');
                 btnText.innerText = "Modo Simulador";
             } catch (err) {
-                // Caso esteja em iframe sem permissão de câmera ou desktop sem webcam, exibe aviso amigável no card
+                // O Atlas 3D continua disponível mesmo quando a câmera não pode ser ativada.
                 updateInfoCard({
                     badge: "📷",
-                    system: "Simulador RA Ativo",
-                    title: "Câmera Simulada em Execução",
-                    description: "A permissão da câmera física não está disponível neste ambiente de visualização, então mantivemos o marcador de superfície RA virtual ativo!",
-                    funFact: "No aplicativo Android final com ARCore, a câmera traseira detecta mesas e cartões impressos instantaneamente.",
+                    system: "Câmera opcional",
+                    title: "Não foi possível abrir a câmera",
+                    description: "Confira se o BioAR recebeu permissão para usar a câmera nas configurações do Android. O Atlas 3D, as animações e o quiz continuam disponíveis sem câmera.",
+                    funFact: "Nesta versão, a câmera aparece como plano de fundo. O rastreamento de realidade aumentada será implementado em uma etapa posterior.",
                     color: "#0ea5e9"
                 });
             }
