@@ -43,9 +43,9 @@ Requisitos: Node.js 24, JDK 21 e Android SDK 36.
 ```bash
 npm install
 npm run build
-npx cap add android
-npx cap sync android
-npx cap open android
+npm run android:add
+npm run android:sync
+npm run android:open
 ```
 
 Para compilar o APK de depuração em Linux/macOS:
@@ -54,7 +54,7 @@ Para compilar o APK de depuração em Linux/macOS:
 npm run android:apk
 ```
 
-Após alterações nos arquivos web, execute novamente `npm run android:sync` antes de compilar.
+Após alterações nos arquivos web, execute novamente `npm run android:sync` antes de compilar. O script também reaplica as permissões Android e remove a permissão de internet.
 
 ## Identificador Android
 
