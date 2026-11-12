@@ -41,6 +41,11 @@ for (const url of prohibited) {
 await rm(buildRoot, { recursive: true, force: true });
 await mkdir(path.join(buildRoot, 'src'), { recursive: true });
 await mkdir(path.join(buildRoot, 'public', 'vendor'), { recursive: true });
+await mkdir(path.join(buildRoot, 'public', 'ar-markers'), { recursive: true });
+await copyFile(
+  path.join(root, 'public', 'ar-markers', 'heart-marker.png'),
+  path.join(buildRoot, 'public', 'ar-markers', 'heart-marker.png')
+);
 await writeFile(path.join(buildRoot, 'index.html'), html, 'utf8');
 await copyFile(sourceCss, path.join(buildRoot, 'src', 'styles.css'));
 console.log('Fonte isolada para o APK offline criada em .offline-build.');
