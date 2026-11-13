@@ -258,7 +258,7 @@
                         <i class="ph-fill ph-speaker-high text-lg"></i>
                     </button>
                     <button onclick="toggleInfoDetails()" id="info-details-toggle" class="cartoon-btn bg-slate-100 hover:bg-slate-200 text-slate-800 w-9 h-9 rounded-xl flex items-center justify-center" title="Mostrar descrição" aria-label="Mostrar descrição">
-                        <i id="info-details-toggle-icon" class="ph-bold ph-caret-up text-lg"></i>
+                        <i id="info-details-toggle-icon" class="ph-bold ph-caret-down text-lg"></i>
                     </button>
                 </div>
             </div>
@@ -1104,7 +1104,7 @@
             const expanded = card.classList.toggle('info-card-compact') === false;
             button.title = expanded ? 'Ocultar descrição' : 'Mostrar descrição';
             button.setAttribute('aria-label', button.title);
-            icon.className = expanded ? 'ph-bold ph-caret-down text-lg' : 'ph-bold ph-caret-up text-lg';
+            icon.className = expanded ? 'ph-bold ph-caret-up text-lg' : 'ph-bold ph-caret-down text-lg';
         }
 
         function selectOrgan(organKey) {
