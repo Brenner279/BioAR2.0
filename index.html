@@ -87,6 +87,29 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        /* Cartão educativo compacto para não encobrir o modelo 3D */
+        #info-card.info-card-compact #info-description,
+        #info-card.info-card-compact #info-funfact-box {
+            display: none;
+        }
+
+        #info-card:not(.info-card-compact) #info-details {
+            display: block;
+            max-height: min(26vh, 190px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
+        #info-card.info-card-compact #info-details {
+            display: none;
+        }
+
+        @media (max-height: 700px) {
+            #info-card:not(.info-card-compact) #info-details {
+                max-height: 20vh;
+            }
+        }
     </style>
 </head>
 <body class="w-screen h-screen relative flex flex-col justify-between overflow-hidden">
@@ -212,45 +235,51 @@
     </div>
 
     <!-- Área Inferior: Card de Informações da Parte + Carrossel de Órgãos -->
-    <footer class="relative z-30 p-3 sm:p-4 flex flex-col items-center gap-3 pointer-events-none">
+    <footer class="relative z-30 px-2 pb-2 pt-1 sm:px-3 sm:pb-3 flex flex-col items-center gap-2 pointer-events-none">
         
         <!-- Card Educativo de Detalhes da Parte Selecionada -->
-        <div id="info-card" class="w-full max-w-lg bg-white rounded-3xl p-4 sm:p-5 cartoon-card pointer-events-auto transition-all duration-300 transform translate-y-0">
-            <div class="flex items-start justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <div id="info-badge" class="w-11 h-11 rounded-2xl bg-rose-500 text-white font-black text-lg flex items-center justify-center border-2 border-slate-800 shrink-0 shadow-inner">
+        <div id="info-card" class="info-card-compact w-full max-w-md bg-white rounded-2xl p-2.5 cartoon-card pointer-events-auto transition-all duration-200">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div id="info-badge" class="w-9 h-9 rounded-xl bg-rose-500 text-white font-black text-base flex items-center justify-center border-2 border-slate-800 shrink-0 shadow-inner">
                         1
                     </div>
-                    <div>
-                        <span id="info-system-tag" class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-300">
+                    <div class="min-w-0">
+                        <span id="info-system-tag" class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-300">
                             Sistema Cardiovascular
                         </span>
-                        <h3 id="info-title" class="text-lg sm:text-xl font-black text-slate-800 leading-tight mt-0.5">
+                        <h3 id="info-title" class="text-base font-black text-slate-800 leading-tight mt-0.5 truncate">
                             Coração Humano
                         </h3>
                     </div>
                 </div>
-                <!-- Botão de Narração em Voz (Web Speech API) -->
-                <button onclick="speakCurrentInfo()" class="cartoon-btn bg-sky-100 hover:bg-sky-200 text-sky-900 p-2 rounded-xl shrink-0" title="Ouvir explicação">
-                    <i class="ph-fill ph-speaker-high text-xl"></i>
-                </button>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="speakCurrentInfo()" class="cartoon-btn bg-sky-100 hover:bg-sky-200 text-sky-900 w-9 h-9 rounded-xl flex items-center justify-center" title="Ouvir explicação" aria-label="Ouvir explicação">
+                        <i class="ph-fill ph-speaker-high text-lg"></i>
+                    </button>
+                    <button onclick="toggleInfoDetails()" id="info-details-toggle" class="cartoon-btn bg-slate-100 hover:bg-slate-200 text-slate-800 w-9 h-9 rounded-xl flex items-center justify-center" title="Mostrar descrição" aria-label="Mostrar descrição">
+                        <i id="info-details-toggle-icon" class="ph-bold ph-caret-up text-lg"></i>
+                    </button>
+                </div>
             </div>
 
-            <p id="info-description" class="text-xs sm:text-sm font-bold text-slate-600 mt-2.5 leading-relaxed">
-                Toque nos pinos numerados sobre o órgão 3D para descobrir o nome e a função de cada estrutura anatômica!
-            </p>
-
-            <!-- Curiosidade Didática -->
-            <div id="info-funfact-box" class="mt-3 bg-amber-50 border-2 border-amber-300 rounded-2xl p-2.5 flex items-center gap-2.5">
-                <span class="text-xl shrink-0">💡</span>
-                <p id="info-funfact" class="text-xs font-extrabold text-amber-900 leading-snug">
-                    O coração bate cerca de 100.000 vezes por dia, bombeando 5 litros de sangue por minuto!
+            <div id="info-details">
+                <p id="info-description" class="text-xs font-bold text-slate-600 mt-2 leading-relaxed">
+                    Toque nos pinos numerados sobre o órgão 3D para descobrir o nome e a função de cada estrutura anatômica!
                 </p>
+
+                <!-- Curiosidade Didática -->
+                <div id="info-funfact-box" class="mt-2 bg-amber-50 border border-amber-300 rounded-xl p-2 flex items-center gap-2">
+                    <span class="text-base shrink-0">💡</span>
+                    <p id="info-funfact" class="text-[11px] font-extrabold text-amber-900 leading-snug">
+                        O coração bate cerca de 100.000 vezes por dia, bombeando 5 litros de sangue por minuto!
+                    </p>
+                </div>
             </div>
         </div>
 
         <!-- Seletor de Órgãos (Dock Inferior) -->
-        <div class="w-full max-w-lg bg-slate-900/90 backdrop-blur-md p-2 rounded-2xl border-2 border-slate-700 flex items-center justify-around gap-1.5 pointer-events-auto overflow-x-auto no-scrollbar">
+        <div class="w-full max-w-md bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border-2 border-slate-700 flex items-center justify-around gap-1 pointer-events-auto overflow-x-auto no-scrollbar">
             <button onclick="selectOrgan('heart')" id="tab-heart" class="organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all bg-rose-500 text-white border-2 border-slate-900 shadow">
                 <span>❤️</span> <span>Coração</span>
             </button>
@@ -1068,6 +1097,16 @@
         /********************************************************************
          * 5. FUNÇÕES DE INTERFACE (QUIZ, CÂMERA REAL, VOZ, EXPLODIR)
          ********************************************************************/
+        function toggleInfoDetails() {
+            const card = document.getElementById('info-card');
+            const button = document.getElementById('info-details-toggle');
+            const icon = document.getElementById('info-details-toggle-icon');
+            const expanded = card.classList.toggle('info-card-compact') === false;
+            button.title = expanded ? 'Ocultar descrição' : 'Mostrar descrição';
+            button.setAttribute('aria-label', button.title);
+            icon.className = expanded ? 'ph-bold ph-caret-down text-lg' : 'ph-bold ph-caret-up text-lg';
+        }
+
         function selectOrgan(organKey) {
             document.querySelectorAll('.organ-tab').forEach(btn => {
                 btn.className = "organ-tab flex-1 py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-300 hover:bg-slate-800";
