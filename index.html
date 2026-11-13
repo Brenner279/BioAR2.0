@@ -208,6 +208,19 @@
             <i class="ph-bold ph-cube-focus text-lg sm:text-xl"></i>
             <span class="text-[9px] font-extrabold">Centro</span>
         </button>
+
+        <div id="scale-controls" class="w-32 bg-white/95 backdrop-blur-md border-2 border-slate-800 rounded-2xl p-2 shadow-lg">
+            <div class="flex items-center justify-between gap-1 mb-1.5">
+                <span class="text-[10px] font-black uppercase tracking-wide text-slate-600">Tamanho</span>
+                <span id="organ-scale-value" class="text-xs font-black text-sky-700 tabular-nums">90%</span>
+            </div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <button onclick="adjustOrganScale(-0.05)" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black" aria-label="Diminuir órgão">−</button>
+                <button onclick="adjustOrganScale(0.05)" class="w-7 h-7 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-900 font-black" aria-label="Aumentar órgão">+</button>
+            </div>
+            <input id="organ-scale-slider" type="range" min="0.55" max="1.45" step="0.05" value="0.9" oninput="setOrganScale(this.value)" class="w-full h-2 accent-sky-500 cursor-pointer" aria-label="Ajustar tamanho do órgão">
+            <p class="text-[9px] text-center font-bold text-slate-500 mt-1">55% a 145%</p>
+        </div>
     </div>
 
     <!-- Área Inferior: Card de Informações da Parte + Carrossel de Órgãos -->
@@ -594,7 +607,10 @@
         let isDragging = false;
         let prevPointer = { x: 0, y: 0 };
         let targetRotation = { x: 0.15, y: -0.3 };
-        let currentScale = 1;
+        const DEFAULT_ORGAN_SCALE = 0.9;
+        const MIN_ORGAN_SCALE = 0.55;
+        const MAX_ORGAN_SCALE = 1.45;
+        let currentScale = DEFAULT_ORGAN_SCALE;
 
         const raycaster = new THREE.Raycaster();
         const pointer = new THREE.Vector2();
@@ -926,6 +942,8 @@
             currentOrganKey = organKey;
             selectedPartId = null;
             isExploded = false;
+            currentScale = DEFAULT_ORGAN_SCALE;
+            updateScaleControls();
             updateExplodeBtnUI();
 
             // Limpa órgão anterior
@@ -1106,10 +1124,28 @@
             btn.classList.toggle('bg-white', !isAnimating);
         }
 
+        function setOrganScale(value) {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) return;
+            currentScale = Math.max(MIN_ORGAN_SCALE, Math.min(MAX_ORGAN_SCALE, parsed));
+            updateScaleControls();
+        }
+
+        function adjustOrganScale(amount) {
+            setOrganScale(currentScale + amount);
+        }
+
+        function updateScaleControls() {
+            const slider = document.getElementById('organ-scale-slider');
+            const label = document.getElementById('organ-scale-value');
+            if (slider) slider.value = String(currentScale);
+            if (label) label.textContent = `${Math.round(currentScale * 100)}%`;
+        }
+
         function resetCameraView() {
             targetRotation = { x: 0.15, y: -0.3 };
-            currentScale = 1;
-            if (organGroup) organGroup.scale.setScalar(1);
+            currentScale = DEFAULT_ORGAN_SCALE;
+            updateScaleControls();
         }
 
         // Modo Desafio Quiz
@@ -1138,8 +1174,8 @@
             document.getElementById('quiz-feedback').classList.add('hidden');
         }
 
-        // Leitura em Voz Alta (Acessibilidade & Didática)
-        function speakCurrentInfo() {
+        // Leitura em Voz Alta: prioriza o mecanismo nativo do Android no APK.
+        async function speakCurrentInfo() {
             const organData = ORGANS_DATA[currentOrganKey];
             const selectedPart = selectedPartId
                 ? organData.parts.find(part => part.id === selectedPartId)
@@ -1147,13 +1183,24 @@
             const narrationTitle = selectedPart ? selectedPart.name : organData.name;
             const narrationDescription = selectedPart ? selectedPart.description : organData.description;
             const narrationFact = selectedPart ? selectedPart.funFact : organData.funFact;
+            const narrationText = `${narrationTitle}. ${narrationDescription}. Curiosidade: ${narrationFact}`;
 
-            if (!('speechSynthesis' in window)) {
+            const nativePlugin = window.Capacitor?.Plugins?.BioARCore;
+            if (nativePlugin?.speakText && window.Capacitor?.isNativePlatform?.()) {
+                try {
+                    await nativePlugin.speakText({ text: narrationText });
+                    return;
+                } catch (error) {
+                    console.warn('TTS nativo indisponível; tentando a voz do navegador.', error);
+                }
+            }
+
+            if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
                 updateInfoCard({
                     badge: "🔊",
                     system: "Narração",
-                    title: "Narração indisponível",
-                    description: "Este dispositivo não disponibilizou o serviço de síntese de voz.",
+                    title: "Áudio indisponível",
+                    description: "Este dispositivo não disponibilizou um mecanismo de leitura em voz alta.",
                     funFact: "O Atlas 3D, os modelos e o quiz continuam funcionando normalmente.",
                     color: "#0ea5e9"
                 });
@@ -1161,29 +1208,40 @@
             }
 
             const synth = window.speechSynthesis;
-            const localPortugueseVoice = synth.getVoices().find(voice =>
-                voice.localService === true && /^pt[-_]/i.test(voice.lang)
-            );
+            const voices = synth.getVoices();
+            const nativeMode = Boolean(window.Capacitor?.isNativePlatform?.());
+            const portugueseVoice = voices.find(voice =>
+                /^pt[-_]/i.test(voice.lang) && (!nativeMode || voice.localService === true)
+            ) || (!nativeMode ? voices.find(voice => /^pt[-_]/i.test(voice.lang)) : null);
 
-            if (!localPortugueseVoice) {
+            if (nativeMode && !portugueseVoice) {
                 updateInfoCard({
                     badge: "🔊",
                     system: "Narração offline",
-                    title: "Voz em português não encontrada",
-                    description: "Para narrar sem internet, instale uma voz em português (Brasil) no mecanismo de Texto para fala do Android. Caso já tenha instalado, aguarde alguns segundos e tente novamente.",
-                    funFact: "O BioAR usa somente vozes locais. Ele não recorrerá a serviços de voz pela internet.",
+                    title: "Instale uma voz em português",
+                    description: "O Android não encontrou uma voz local em português. Nas configurações do aparelho, abra Texto para fala e baixe os dados de voz Português (Brasil). Depois, volte ao BioAR e tente novamente.",
+                    funFact: "A narração do APK utiliza vozes instaladas no aparelho e não depende de internet.",
                     color: "#0ea5e9"
                 });
                 return;
             }
 
             synth.cancel();
-            const utterance = new SpeechSynthesisUtterance(
-                `${narrationTitle}. ${narrationDescription}. Curiosidade: ${narrationFact}`
-            );
-            utterance.voice = localPortugueseVoice;
-            utterance.lang = localPortugueseVoice.lang || 'pt-BR';
-            utterance.rate = 1.05;
+            const utterance = new SpeechSynthesisUtterance(narrationText);
+            utterance.lang = portugueseVoice?.lang || 'pt-BR';
+            if (portugueseVoice) utterance.voice = portugueseVoice;
+            utterance.rate = 0.98;
+            utterance.onerror = event => {
+                console.warn('Falha na síntese de voz:', event.error);
+                updateInfoCard({
+                    badge: "🔊",
+                    system: "Narração",
+                    title: "Não foi possível reproduzir o áudio",
+                    description: "Verifique se o mecanismo de Texto para fala está ativo e possui uma voz em português instalada.",
+                    funFact: "A leitura em voz alta pode funcionar sem internet quando os dados de voz estão instalados localmente.",
+                    color: "#0ea5e9"
+                });
+            };
             synth.speak(utterance);
         }
 
@@ -1362,7 +1420,7 @@
         }
 
         function onMouseWheel(e) {
-            currentScale = Math.max(0.65, Math.min(1.45, currentScale - e.deltaY * 0.001));
+            setOrganScale(currentScale - e.deltaY * 0.001);
         }
 
         function checkRaycastSelection(clientX, clientY) {
