@@ -3,7 +3,7 @@ package br.com.michelbrenner.bioar.arcore;
 import android.app.Activity;
 import android.content.Intent;
 import androidx.activity.result.ActivityResult;
-import com.getcapacitor.ActivityCallback;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
