@@ -22,7 +22,7 @@ import android.widget.TextView;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.AugmentedImageDatabase;
-import com.google.ar.core.CameraNotAvailableException;
+import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.core.Config;
 import com.google.ar.core.Coordinates2d;
 import com.google.ar.core.Frame;
