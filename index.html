@@ -209,18 +209,6 @@
             <span class="text-[9px] font-extrabold">Centro</span>
         </button>
 
-        <div id="scale-controls" class="w-32 bg-white/95 backdrop-blur-md border-2 border-slate-800 rounded-2xl p-2 shadow-lg">
-            <div class="flex items-center justify-between gap-1 mb-1.5">
-                <span class="text-[10px] font-black uppercase tracking-wide text-slate-600">Tamanho</span>
-                <span id="organ-scale-value" class="text-xs font-black text-sky-700 tabular-nums">90%</span>
-            </div>
-            <div class="flex items-center justify-between gap-2 mb-2">
-                <button onclick="adjustOrganScale(-0.05)" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black" aria-label="Diminuir órgão">−</button>
-                <button onclick="adjustOrganScale(0.05)" class="w-7 h-7 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-900 font-black" aria-label="Aumentar órgão">+</button>
-            </div>
-            <input id="organ-scale-slider" type="range" min="0.55" max="1.45" step="0.05" value="0.9" oninput="setOrganScale(this.value)" class="w-full h-2 accent-sky-500 cursor-pointer" aria-label="Ajustar tamanho do órgão">
-            <p class="text-[9px] text-center font-bold text-slate-500 mt-1">55% a 145%</p>
-        </div>
     </div>
 
     <!-- Área Inferior: Card de Informações da Parte + Carrossel de Órgãos -->
@@ -607,7 +595,7 @@
         let isDragging = false;
         let prevPointer = { x: 0, y: 0 };
         let targetRotation = { x: 0.15, y: -0.3 };
-        const DEFAULT_ORGAN_SCALE = 0.9;
+        const DEFAULT_ORGAN_SCALE = 1;
         const MIN_ORGAN_SCALE = 0.55;
         const MAX_ORGAN_SCALE = 1.45;
         let currentScale = DEFAULT_ORGAN_SCALE;
@@ -943,7 +931,6 @@
             selectedPartId = null;
             isExploded = false;
             currentScale = DEFAULT_ORGAN_SCALE;
-            updateScaleControls();
             updateExplodeBtnUI();
 
             // Limpa órgão anterior
@@ -1128,24 +1115,11 @@
             const parsed = Number(value);
             if (!Number.isFinite(parsed)) return;
             currentScale = Math.max(MIN_ORGAN_SCALE, Math.min(MAX_ORGAN_SCALE, parsed));
-            updateScaleControls();
-        }
-
-        function adjustOrganScale(amount) {
-            setOrganScale(currentScale + amount);
-        }
-
-        function updateScaleControls() {
-            const slider = document.getElementById('organ-scale-slider');
-            const label = document.getElementById('organ-scale-value');
-            if (slider) slider.value = String(currentScale);
-            if (label) label.textContent = `${Math.round(currentScale * 100)}%`;
         }
 
         function resetCameraView() {
             targetRotation = { x: 0.15, y: -0.3 };
             currentScale = DEFAULT_ORGAN_SCALE;
-            updateScaleControls();
         }
 
         // Modo Desafio Quiz
@@ -1382,23 +1356,56 @@
 
             // Eventos de Interação Touch e Mouse
             const domElem = renderer.domElement;
+            domElem.style.touchAction = 'none';
             domElem.addEventListener('pointerdown', onPointerDown);
             window.addEventListener('pointermove', onPointerMove);
             window.addEventListener('pointerup', onPointerUp);
+            window.addEventListener('pointercancel', onPointerCancel);
             domElem.addEventListener('wheel', onMouseWheel, { passive: true });
             window.addEventListener('resize', onWindowResize);
         }
 
         let pointerDownPos = { x: 0, y: 0 };
+        const activePointers = new Map();
+        let isPinching = false;
+        let pinchStartDistance = 0;
+        let pinchStartScale = DEFAULT_ORGAN_SCALE;
+
+        function distanceBetweenPointers(a, b) {
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        }
 
         function onPointerDown(e) {
+            if (e.cancelable) e.preventDefault();
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (activePointers.size >= 2) {
+                const points = Array.from(activePointers.values());
+                isPinching = true;
+                isDragging = false;
+                pinchStartDistance = Math.max(1, distanceBetweenPointers(points[0], points[1]));
+                pinchStartScale = currentScale;
+                return;
+            }
+
             isDragging = true;
             prevPointer = { x: e.clientX, y: e.clientY };
             pointerDownPos = { x: e.clientX, y: e.clientY };
         }
 
         function onPointerMove(e) {
-            if (!isDragging) return;
+            if (activePointers.has(e.pointerId)) {
+                activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            }
+
+            if (isPinching && activePointers.size >= 2) {
+                const points = Array.from(activePointers.values());
+                const currentDistance = distanceBetweenPointers(points[0], points[1]);
+                setOrganScale(pinchStartScale * (currentDistance / pinchStartDistance));
+                return;
+            }
+
+            if (!isDragging || activePointers.size > 1) return;
             const deltaX = e.clientX - prevPointer.x;
             const deltaY = e.clientY - prevPointer.y;
 
@@ -1409,14 +1416,30 @@
         }
 
         function onPointerUp(e) {
-            if (!isDragging) return;
+            const wasPinching = isPinching || activePointers.size > 1;
+            const wasDragging = isDragging;
+            const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            activePointers.delete(e.pointerId);
+
+            if (wasPinching) {
+                isPinching = false;
+                isDragging = false;
+                return;
+            }
+
+            if (!wasDragging) return;
             isDragging = false;
 
-            // Se o movimento foi mínimo, interpreta como um Toque/Clique (Raycast 3D)
-            const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            // Um toque simples continua selecionando as estruturas anatômicas.
             if (moveDist < 6) {
                 checkRaycastSelection(e.clientX, e.clientY);
             }
+        }
+
+        function onPointerCancel(e) {
+            activePointers.delete(e.pointerId);
+            isDragging = false;
+            isPinching = false;
         }
 
         function onMouseWheel(e) {
